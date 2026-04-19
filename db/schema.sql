@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS schema_version (
+    version_num INT NOT NULL PRIMARY KEY,
+    description VARCHAR(255) NOT NULL,
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

@@ -1,0 +1,50 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: mindshare
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DB:mindshare}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      initialization-fail-timeout: -1
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DB:0}
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:25}
+    username: ${MAIL_USER:}
+    password: ${MAIL_PASSWORD:}
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.mindshare
+  configuration:
+    map-underscore-to-camel-case: true
+
+auth:
+  jwt:
+    issuer: ${AUTH_JWT_ISSUER:mindshare}
+    access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:PT30M}
+    refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:P14D}
+
+oss:
+  endpoint: ${OSS_ENDPOINT:https://oss-cn-hangzhou.aliyuncs.com}
+  bucket: ${OSS_BUCKET:mindshare-dev}
+  access-key-id: ${OSS_ACCESS_KEY_ID:test-access-key-id}
+  access-key-secret: ${OSS_ACCESS_KEY_SECRET:test-access-key-secret}
+  base-path: ${OSS_BASE_PATH:mindshare}
+  presign-expire-seconds: ${OSS_PRESIGN_EXPIRE_SECONDS:900}
+
+elasticsearch:
+  uris: ${ES_URIS:http://localhost:9200}
+  username: ${ES_USERNAME:elastic}
+  password: ${ES_PASSWORD:changeme}
+  index-name: ${ES_INDEX_NAME:mindshare_knowpost}
