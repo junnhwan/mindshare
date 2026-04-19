@@ -53,7 +53,7 @@ oss:
   access-key-id: ${OSS_ACCESS_KEY_ID:test-access-key-id}
   access-key-secret: ${OSS_ACCESS_KEY_SECRET:test-access-key-secret}
   base-path: ${OSS_BASE_PATH:mindshare}
-  presign-expire-seconds: ${OSS_PRESIGN_EXPIRE_SECONDS:900}
+  presign-expire-seconds: ${OSS_PRESIGN_EXPIRE_SECONDS:600}
 
 mindshare:
   elasticsearch:

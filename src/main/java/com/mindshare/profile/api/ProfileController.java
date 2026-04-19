@@ -5,6 +5,7 @@ import com.mindshare.profile.api.dto.ProfilePatchRequest;
 import com.mindshare.profile.api.dto.ProfileResponse;
 import com.mindshare.profile.service.ProfileService;
 import jakarta.validation.Valid;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/profile")
 @Validated
+@Profile("!bootstrap-test")
 public class ProfileController {
 
     private final ProfileService profileService;

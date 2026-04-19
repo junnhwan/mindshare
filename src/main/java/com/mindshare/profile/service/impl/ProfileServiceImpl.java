@@ -7,10 +7,12 @@ import com.mindshare.profile.api.dto.ProfileResponse;
 import com.mindshare.profile.service.ProfileService;
 import com.mindshare.user.domain.User;
 import com.mindshare.user.mapper.UserMapper;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Profile("!bootstrap-test")
 public class ProfileServiceImpl implements ProfileService {
 
     private final UserMapper userMapper;
