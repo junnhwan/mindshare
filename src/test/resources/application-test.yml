@@ -8,3 +8,7 @@ spring:
     init:
       mode: always
       schema-locations: file:db/schema.sql
+
+mindshare:
+  cache:
+    redis-enabled: false

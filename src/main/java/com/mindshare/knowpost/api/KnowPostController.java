@@ -10,6 +10,7 @@ import com.mindshare.knowpost.api.dto.KnowPostDraftCreateResponse;
 import com.mindshare.knowpost.api.dto.KnowPostPatchRequest;
 import com.mindshare.knowpost.api.dto.KnowPostTopPatchRequest;
 import com.mindshare.knowpost.api.dto.KnowPostVisibilityPatchRequest;
+import com.mindshare.knowpost.service.KnowPostFeedService;
 import com.mindshare.knowpost.service.KnowPostService;
 import jakarta.validation.Valid;
 import org.springframework.context.annotation.Profile;
@@ -34,10 +35,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class KnowPostController {
 
     private final KnowPostService knowPostService;
+    private final KnowPostFeedService knowPostFeedService;
     private final JwtService jwtService;
 
-    public KnowPostController(KnowPostService knowPostService, JwtService jwtService) {
+    public KnowPostController(KnowPostService knowPostService, KnowPostFeedService knowPostFeedService, JwtService jwtService) {
         this.knowPostService = knowPostService;
+        this.knowPostFeedService = knowPostFeedService;
         this.jwtService = jwtService;
     }
 
@@ -113,7 +116,8 @@ public class KnowPostController {
     public FeedPageResponse feed(@RequestParam(value = "page", defaultValue = "1") int page,
                                  @RequestParam(value = "size", defaultValue = "20") int size,
                                  @AuthenticationPrincipal Jwt jwt) {
-        return knowPostService.getPublicFeed(page, size);
+        Long userId = jwt == null ? null : jwtService.extractUserId(jwt);
+        return knowPostFeedService.getPublicFeed(page, size, userId);
     }
 
     @GetMapping("/mine")
@@ -121,7 +125,7 @@ public class KnowPostController {
                                  @RequestParam(value = "size", defaultValue = "20") int size,
                                  @AuthenticationPrincipal Jwt jwt) {
         long userId = jwtService.extractUserId(jwt);
-        return knowPostService.getMyPublished(userId, page, size);
+        return knowPostFeedService.getMyPublished(userId, page, size);
     }
 
     @GetMapping("/detail/{id}")

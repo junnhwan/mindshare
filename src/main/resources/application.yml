@@ -56,6 +56,13 @@ oss:
   presign-expire-seconds: ${OSS_PRESIGN_EXPIRE_SECONDS:600}
 
 mindshare:
+  cache:
+    redis-enabled: true
+    feed-maximum-size: 128
+    detail-maximum-size: 256
+    public-feed-ttl: PT5M
+    my-feed-ttl: PT3M
+    detail-ttl: PT5M
   elasticsearch:
     enabled: true
     index-name: ${ES_INDEX_NAME:mindshare_knowpost}

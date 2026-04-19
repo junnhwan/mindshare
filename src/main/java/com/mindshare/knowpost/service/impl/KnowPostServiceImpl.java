@@ -3,6 +3,8 @@ package com.mindshare.knowpost.service.impl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.mindshare.cache.config.CacheProperties;
 import com.mindshare.common.exception.BusinessException;
 import com.mindshare.common.exception.ErrorCode;
 import com.mindshare.knowpost.api.dto.DescriptionSuggestResponse;
@@ -14,9 +16,12 @@ import com.mindshare.knowpost.mapper.KnowPostMapper;
 import com.mindshare.knowpost.model.KnowPost;
 import com.mindshare.knowpost.model.KnowPostDetailRow;
 import com.mindshare.knowpost.model.KnowPostFeedRow;
+import com.mindshare.knowpost.service.KnowPostFeedService;
 import com.mindshare.knowpost.service.KnowPostService;
 import com.mindshare.storage.OssStorageService;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,17 +37,29 @@ public class KnowPostServiceImpl implements KnowPostService {
     private final SnowflakeIdGenerator idGenerator;
     private final ObjectMapper objectMapper;
     private final OssStorageService ossStorageService;
+    private final KnowPostFeedService knowPostFeedService;
+    private final CacheProperties cacheProperties;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final Cache<String, KnowPostDetailResponse> knowPostDetailCache;
 
     public KnowPostServiceImpl(
             KnowPostMapper knowPostMapper,
             SnowflakeIdGenerator idGenerator,
             ObjectMapper objectMapper,
-            OssStorageService ossStorageService
+            OssStorageService ossStorageService,
+            KnowPostFeedService knowPostFeedService,
+            CacheProperties cacheProperties,
+            StringRedisTemplate stringRedisTemplate,
+            @Qualifier("knowPostDetailCache") Cache<String, KnowPostDetailResponse> knowPostDetailCache
     ) {
         this.knowPostMapper = knowPostMapper;
         this.idGenerator = idGenerator;
         this.objectMapper = objectMapper;
         this.ossStorageService = ossStorageService;
+        this.knowPostFeedService = knowPostFeedService;
+        this.cacheProperties = cacheProperties;
+        this.stringRedisTemplate = stringRedisTemplate;
+        this.knowPostDetailCache = knowPostDetailCache;
     }
 
     @Override
@@ -79,6 +96,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "draft not found or no permission");
         }
+        invalidateCaches(creatorId, id);
     }
 
     @Override
@@ -108,6 +126,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "draft not found or no permission");
         }
+        invalidateCaches(creatorId, id);
     }
 
     @Override
@@ -117,6 +136,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "draft not found or no permission");
         }
+        invalidateCaches(creatorId, id);
     }
 
     @Override
@@ -126,6 +146,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "draft not found or no permission");
         }
+        invalidateCaches(creatorId, id);
     }
 
     @Override
@@ -138,6 +159,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "draft not found or no permission");
         }
+        invalidateCaches(creatorId, id);
     }
 
     @Override
@@ -147,11 +169,23 @@ public class KnowPostServiceImpl implements KnowPostService {
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "draft not found or no permission");
         }
+        invalidateCaches(creatorId, id);
     }
 
     @Override
     @Transactional(readOnly = true)
     public KnowPostDetailResponse getDetail(long id, Long currentUserIdNullable) {
+        String cacheKey = detailCacheKey(id);
+        KnowPostDetailResponse cached = knowPostDetailCache.getIfPresent(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+        KnowPostDetailResponse redisCached = readDetailRedis(cacheKey);
+        if (redisCached != null) {
+            knowPostDetailCache.put(cacheKey, redisCached);
+            return redisCached;
+        }
+
         KnowPostDetailRow row = knowPostMapper.findDetailById(id);
         if (row == null || "deleted".equals(row.getStatus())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "content not found");
@@ -163,7 +197,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         if (!isPublic && !isOwner) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "no permission to view");
         }
-        return new KnowPostDetailResponse(
+        KnowPostDetailResponse response = new KnowPostDetailResponse(
                 String.valueOf(row.getId()),
                 row.getTitle(),
                 row.getDescription(),
@@ -183,34 +217,21 @@ public class KnowPostServiceImpl implements KnowPostService {
                 row.getType(),
                 row.getPublishTime()
         );
+        knowPostDetailCache.put(cacheKey, response);
+        writeDetailRedis(cacheKey, response);
+        return response;
     }
 
     @Override
     @Transactional(readOnly = true)
     public FeedPageResponse getPublicFeed(int page, int size) {
-        int safeSize = normalizeSize(size);
-        int safePage = normalizePage(page);
-        int offset = (safePage - 1) * safeSize;
-        List<KnowPostFeedRow> rows = knowPostMapper.listFeedPublic(safeSize + 1, offset);
-        boolean hasMore = rows.size() > safeSize;
-        if (hasMore) {
-            rows = rows.subList(0, safeSize);
-        }
-        return new FeedPageResponse(mapRows(rows), safePage, safeSize, hasMore);
+        return knowPostFeedService.getPublicFeed(page, size, null);
     }
 
     @Override
     @Transactional(readOnly = true)
     public FeedPageResponse getMyPublished(long creatorId, int page, int size) {
-        int safeSize = normalizeSize(size);
-        int safePage = normalizePage(page);
-        int offset = (safePage - 1) * safeSize;
-        List<KnowPostFeedRow> rows = knowPostMapper.listMyPublished(creatorId, safeSize + 1, offset);
-        boolean hasMore = rows.size() > safeSize;
-        if (hasMore) {
-            rows = rows.subList(0, safeSize);
-        }
-        return new FeedPageResponse(mapRows(rows), safePage, safeSize, hasMore);
+        return knowPostFeedService.getMyPublished(creatorId, page, size);
     }
 
     @Override
@@ -281,5 +302,53 @@ public class KnowPostServiceImpl implements KnowPostService {
             case "public", "followers", "school", "private", "unlisted" -> true;
             default -> false;
         };
+    }
+
+    private void invalidateCaches(long creatorId, long postId) {
+        invalidateDetailCache(postId);
+        knowPostFeedService.invalidatePublicFeed();
+        knowPostFeedService.invalidateMyPublished(creatorId);
+    }
+
+    private void invalidateDetailCache(long postId) {
+        String key = detailCacheKey(postId);
+        knowPostDetailCache.invalidate(key);
+        if (!cacheProperties.isRedisEnabled()) {
+            return;
+        }
+        try {
+            stringRedisTemplate.delete(key);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private String detailCacheKey(long id) {
+        return "knowpost:detail:" + id;
+    }
+
+    private KnowPostDetailResponse readDetailRedis(String key) {
+        if (!cacheProperties.isRedisEnabled()) {
+            return null;
+        }
+        try {
+            String json = stringRedisTemplate.opsForValue().get(key);
+            if (json == null || json.isBlank()) {
+                return null;
+            }
+            return objectMapper.readValue(json, KnowPostDetailResponse.class);
+        } catch (Exception exception) {
+            return null;
+        }
+    }
+
+    private void writeDetailRedis(String key, KnowPostDetailResponse response) {
+        if (!cacheProperties.isRedisEnabled()) {
+            return;
+        }
+        try {
+            String json = objectMapper.writeValueAsString(response);
+            stringRedisTemplate.opsForValue().set(key, json, cacheProperties.getDetailTtl());
+        } catch (Exception ignored) {
+        }
     }
 }
