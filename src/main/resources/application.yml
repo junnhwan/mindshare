@@ -22,6 +22,10 @@ spring:
     port: ${MAIL_PORT:25}
     username: ${MAIL_USER:}
     password: ${MAIL_PASSWORD:}
+  elasticsearch:
+    uris: ${ES_URIS:http://localhost:9200}
+    username: ${ES_USERNAME:elastic}
+    password: ${ES_PASSWORD:changeme}
 
 mybatis:
   mapper-locations: classpath*:mapper/**/*.xml
@@ -34,6 +38,8 @@ auth:
     issuer: ${AUTH_JWT_ISSUER:mindshare}
     access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:PT30M}
     refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:P14D}
+    public-key-location: ${AUTH_PUBLIC_KEY_LOCATION:classpath:keys/public.pem}
+    private-key-location: ${AUTH_PRIVATE_KEY_LOCATION:classpath:keys/private.pem}
 
 oss:
   endpoint: ${OSS_ENDPOINT:https://oss-cn-hangzhou.aliyuncs.com}
@@ -43,8 +49,7 @@ oss:
   base-path: ${OSS_BASE_PATH:mindshare}
   presign-expire-seconds: ${OSS_PRESIGN_EXPIRE_SECONDS:900}
 
-elasticsearch:
-  uris: ${ES_URIS:http://localhost:9200}
-  username: ${ES_USERNAME:elastic}
-  password: ${ES_PASSWORD:changeme}
-  index-name: ${ES_INDEX_NAME:mindshare_knowpost}
+mindshare:
+  elasticsearch:
+    enabled: true
+    index-name: ${ES_INDEX_NAME:mindshare_knowpost}

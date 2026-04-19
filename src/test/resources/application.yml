@@ -1,9 +1,18 @@
-spring:
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-
 debug: false
+
+mindshare:
+  redisson:
+    enabled: false
+  elasticsearch:
+    enabled: false
+
+auth:
+  jwt:
+    issuer: mindshare-test
+    access-token-ttl: PT30M
+    refresh-token-ttl: P14D
+    public-key-location: classpath:keys/public.pem
+    private-key-location: classpath:keys/private.pem
 
 logging:
   level:
