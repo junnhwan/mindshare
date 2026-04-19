@@ -29,6 +29,7 @@ class ProfileControllerTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM know_posts");
         jdbcTemplate.update("DELETE FROM login_logs");
         jdbcTemplate.update("DELETE FROM users");
         jdbcTemplate.update("""

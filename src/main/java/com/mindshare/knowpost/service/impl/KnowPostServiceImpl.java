@@ -18,6 +18,7 @@ import com.mindshare.knowpost.model.KnowPostDetailRow;
 import com.mindshare.knowpost.model.KnowPostFeedRow;
 import com.mindshare.knowpost.service.KnowPostFeedService;
 import com.mindshare.knowpost.service.KnowPostService;
+import com.mindshare.search.index.SearchIndexService;
 import com.mindshare.storage.OssStorageService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Profile;
@@ -41,6 +42,7 @@ public class KnowPostServiceImpl implements KnowPostService {
     private final CacheProperties cacheProperties;
     private final StringRedisTemplate stringRedisTemplate;
     private final Cache<String, KnowPostDetailResponse> knowPostDetailCache;
+    private final SearchIndexService searchIndexService;
 
     public KnowPostServiceImpl(
             KnowPostMapper knowPostMapper,
@@ -50,7 +52,8 @@ public class KnowPostServiceImpl implements KnowPostService {
             KnowPostFeedService knowPostFeedService,
             CacheProperties cacheProperties,
             StringRedisTemplate stringRedisTemplate,
-            @Qualifier("knowPostDetailCache") Cache<String, KnowPostDetailResponse> knowPostDetailCache
+            @Qualifier("knowPostDetailCache") Cache<String, KnowPostDetailResponse> knowPostDetailCache,
+            SearchIndexService searchIndexService
     ) {
         this.knowPostMapper = knowPostMapper;
         this.idGenerator = idGenerator;
@@ -60,6 +63,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         this.cacheProperties = cacheProperties;
         this.stringRedisTemplate = stringRedisTemplate;
         this.knowPostDetailCache = knowPostDetailCache;
+        this.searchIndexService = searchIndexService;
     }
 
     @Override
@@ -97,6 +101,7 @@ public class KnowPostServiceImpl implements KnowPostService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "draft not found or no permission");
         }
         invalidateCaches(creatorId, id);
+        searchIndexService.upsertKnowPost(id);
     }
 
     @Override
@@ -127,6 +132,7 @@ public class KnowPostServiceImpl implements KnowPostService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "draft not found or no permission");
         }
         invalidateCaches(creatorId, id);
+        searchIndexService.upsertKnowPost(id);
     }
 
     @Override
@@ -137,6 +143,7 @@ public class KnowPostServiceImpl implements KnowPostService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "draft not found or no permission");
         }
         invalidateCaches(creatorId, id);
+        searchIndexService.upsertKnowPost(id);
     }
 
     @Override
@@ -147,6 +154,7 @@ public class KnowPostServiceImpl implements KnowPostService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "draft not found or no permission");
         }
         invalidateCaches(creatorId, id);
+        searchIndexService.upsertKnowPost(id);
     }
 
     @Override
@@ -160,6 +168,7 @@ public class KnowPostServiceImpl implements KnowPostService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "draft not found or no permission");
         }
         invalidateCaches(creatorId, id);
+        searchIndexService.upsertKnowPost(id);
     }
 
     @Override
@@ -170,6 +179,7 @@ public class KnowPostServiceImpl implements KnowPostService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "draft not found or no permission");
         }
         invalidateCaches(creatorId, id);
+        searchIndexService.deleteKnowPost(id);
     }
 
     @Override
