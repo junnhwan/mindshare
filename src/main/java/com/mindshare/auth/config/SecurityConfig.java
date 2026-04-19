@@ -42,7 +42,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/token/refresh",
-                                "/api/v1/auth/password/reset"
+                                "/api/v1/auth/password/reset",
+                                "/api/v1/knowposts/feed",
+                                "/api/v1/knowposts/detail/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
