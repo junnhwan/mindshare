@@ -28,7 +28,9 @@ spring:
     password: ${ES_PASSWORD:changeme}
 
 mybatis:
-  mapper-locations: classpath*:mapper/**/*.xml
+  mapper-locations:
+    - classpath*:mapper/*.xml
+    - classpath*:mapper/**/*.xml
   type-aliases-package: com.mindshare
   configuration:
     map-underscore-to-camel-case: true
