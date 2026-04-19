@@ -23,8 +23,6 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
-
 import java.io.IOException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
@@ -65,14 +63,14 @@ public class SecurityConfig {
 
     @Bean
     public JwtDecoder jwtDecoder(AuthProperties authProperties) {
-        RSAPublicKey publicKey = PemUtils.readPublicKey(authProperties.getPublicKeyLocation());
+        RSAPublicKey publicKey = PemUtils.readPublicKey(authProperties.getJwt().getPublicKeyLocation());
         return NimbusJwtDecoder.withPublicKey(publicKey).build();
     }
 
     @Bean
     public JwtEncoder jwtEncoder(AuthProperties authProperties) {
-        RSAPublicKey publicKey = PemUtils.readPublicKey(authProperties.getPublicKeyLocation());
-        RSAPrivateKey privateKey = PemUtils.readPrivateKey(authProperties.getPrivateKeyLocation());
+        RSAPublicKey publicKey = PemUtils.readPublicKey(authProperties.getJwt().getPublicKeyLocation());
+        RSAPrivateKey privateKey = PemUtils.readPrivateKey(authProperties.getJwt().getPrivateKeyLocation());
         RSAKey rsaKey = new RSAKey.Builder(publicKey).privateKey(privateKey).build();
         return new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(rsaKey)));
     }

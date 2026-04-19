@@ -42,6 +42,10 @@ auth:
     refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:P14D}
     public-key-location: ${AUTH_PUBLIC_KEY_LOCATION:classpath:keys/public.pem}
     private-key-location: ${AUTH_PRIVATE_KEY_LOCATION:classpath:keys/private.pem}
+  verification:
+    code-length: ${AUTH_CODE_LENGTH:6}
+    ttl: ${AUTH_CODE_TTL:PT5M}
+    max-attempts: ${AUTH_CODE_MAX_ATTEMPTS:5}
 
 oss:
   endpoint: ${OSS_ENDPOINT:https://oss-cn-hangzhou.aliyuncs.com}
