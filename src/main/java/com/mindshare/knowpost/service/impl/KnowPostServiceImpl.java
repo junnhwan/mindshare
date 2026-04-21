@@ -29,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 @Service
 @Profile("!bootstrap-test")
@@ -43,6 +45,7 @@ public class KnowPostServiceImpl implements KnowPostService {
     private final StringRedisTemplate stringRedisTemplate;
     private final Cache<String, KnowPostDetailResponse> knowPostDetailCache;
     private final SearchIndexService searchIndexService;
+    private final ConcurrentMap<String, Object> detailFlights = new ConcurrentHashMap<>();
 
     public KnowPostServiceImpl(
             KnowPostMapper knowPostMapper,
@@ -195,41 +198,57 @@ public class KnowPostServiceImpl implements KnowPostService {
             knowPostDetailCache.put(cacheKey, redisCached);
             return redisCached;
         }
+        Object lock = detailFlights.computeIfAbsent(cacheKey, ignored -> new Object());
+        synchronized (lock) {
+            try {
+                KnowPostDetailResponse localAgain = knowPostDetailCache.getIfPresent(cacheKey);
+                if (localAgain != null) {
+                    return localAgain;
+                }
+                KnowPostDetailResponse redisAgain = readDetailRedis(cacheKey);
+                if (redisAgain != null) {
+                    knowPostDetailCache.put(cacheKey, redisAgain);
+                    return redisAgain;
+                }
 
-        KnowPostDetailRow row = knowPostMapper.findDetailById(id);
-        if (row == null || "deleted".equals(row.getStatus())) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "content not found");
+                KnowPostDetailRow row = knowPostMapper.findDetailById(id);
+                if (row == null || "deleted".equals(row.getStatus())) {
+                    throw new BusinessException(ErrorCode.BAD_REQUEST, "content not found");
+                }
+                boolean isPublic = "published".equals(row.getStatus()) && "public".equals(row.getVisible());
+                boolean isOwner = currentUserIdNullable != null
+                        && row.getCreatorId() != null
+                        && currentUserIdNullable.equals(row.getCreatorId());
+                if (!isPublic && !isOwner) {
+                    throw new BusinessException(ErrorCode.BAD_REQUEST, "no permission to view");
+                }
+                KnowPostDetailResponse response = new KnowPostDetailResponse(
+                        String.valueOf(row.getId()),
+                        row.getTitle(),
+                        row.getDescription(),
+                        row.getContentUrl(),
+                        parseStringArray(row.getImgUrls()),
+                        parseStringArray(row.getTags()),
+                        String.valueOf(row.getCreatorId()),
+                        row.getAuthorAvatar(),
+                        row.getAuthorNickname(),
+                        row.getAuthorTagJson(),
+                        0L,
+                        0L,
+                        null,
+                        null,
+                        row.getIsTop(),
+                        row.getVisible(),
+                        row.getType(),
+                        row.getPublishTime()
+                );
+                knowPostDetailCache.put(cacheKey, response);
+                writeDetailRedis(cacheKey, response);
+                return response;
+            } finally {
+                detailFlights.remove(cacheKey, lock);
+            }
         }
-        boolean isPublic = "published".equals(row.getStatus()) && "public".equals(row.getVisible());
-        boolean isOwner = currentUserIdNullable != null
-                && row.getCreatorId() != null
-                && currentUserIdNullable.equals(row.getCreatorId());
-        if (!isPublic && !isOwner) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "no permission to view");
-        }
-        KnowPostDetailResponse response = new KnowPostDetailResponse(
-                String.valueOf(row.getId()),
-                row.getTitle(),
-                row.getDescription(),
-                row.getContentUrl(),
-                parseStringArray(row.getImgUrls()),
-                parseStringArray(row.getTags()),
-                String.valueOf(row.getCreatorId()),
-                row.getAuthorAvatar(),
-                row.getAuthorNickname(),
-                row.getAuthorTagJson(),
-                0L,
-                0L,
-                null,
-                null,
-                row.getIsTop(),
-                row.getVisible(),
-                row.getType(),
-                row.getPublishTime()
-        );
-        knowPostDetailCache.put(cacheKey, response);
-        writeDetailRedis(cacheKey, response);
-        return response;
     }
 
     @Override
@@ -316,7 +335,7 @@ public class KnowPostServiceImpl implements KnowPostService {
 
     private void invalidateCaches(long creatorId, long postId) {
         invalidateDetailCache(postId);
-        knowPostFeedService.invalidatePublicFeed();
+        knowPostFeedService.invalidatePublicFeedForPost(postId);
         knowPostFeedService.invalidateMyPublished(creatorId);
     }
 

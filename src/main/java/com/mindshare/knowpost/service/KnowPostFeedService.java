@@ -10,5 +10,7 @@ public interface KnowPostFeedService {
 
     void invalidatePublicFeed();
 
+    void invalidatePublicFeedForPost(long postId);
+
     void invalidateMyPublished(long creatorId);
 }

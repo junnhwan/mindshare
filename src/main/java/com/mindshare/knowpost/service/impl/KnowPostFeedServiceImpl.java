@@ -16,7 +16,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 @Service
 @Profile("!bootstrap-test")
@@ -28,6 +32,9 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
     private final StringRedisTemplate stringRedisTemplate;
     private final Cache<String, FeedPageResponse> feedPublicCache;
     private final Cache<String, FeedPageResponse> feedMineCache;
+    private final ConcurrentMap<String, Object> publicFeedFlights = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Set<Long>> publicFeedPageItems = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, Set<String>> publicFeedItemPages = new ConcurrentHashMap<>();
 
     public KnowPostFeedServiceImpl(
             KnowPostMapper knowPostMapper,
@@ -49,7 +56,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
     public FeedPageResponse getPublicFeed(int page, int size, Long currentUserIdNullable) {
         int safePage = normalizePage(page);
         int safeSize = normalizeSize(size);
-        String key = "feed:public:" + safePage + ":" + safeSize;
+        String key = publicFeedKey(safePage, safeSize);
 
         FeedPageResponse local = feedPublicCache.getIfPresent(key);
         if (local != null) {
@@ -58,20 +65,37 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
 
         FeedPageResponse cached = readRedis(key);
         if (cached != null) {
-            feedPublicCache.put(key, cached);
+            cachePublicFeed(key, cached);
             return cached;
         }
 
-        int offset = (safePage - 1) * safeSize;
-        List<KnowPostFeedRow> rows = knowPostMapper.listFeedPublic(safeSize + 1, offset);
-        boolean hasMore = rows.size() > safeSize;
-        if (hasMore) {
-            rows = rows.subList(0, safeSize);
+        Object lock = publicFeedFlights.computeIfAbsent(key, ignored -> new Object());
+        synchronized (lock) {
+            try {
+                FeedPageResponse localAgain = feedPublicCache.getIfPresent(key);
+                if (localAgain != null) {
+                    return localAgain;
+                }
+
+                FeedPageResponse redisAgain = readRedis(key);
+                if (redisAgain != null) {
+                    cachePublicFeed(key, redisAgain);
+                    return redisAgain;
+                }
+
+                int offset = (safePage - 1) * safeSize;
+                List<KnowPostFeedRow> rows = knowPostMapper.listFeedPublic(safeSize + 1, offset);
+                boolean hasMore = rows.size() > safeSize;
+                if (hasMore) {
+                    rows = rows.subList(0, safeSize);
+                }
+                FeedPageResponse response = new FeedPageResponse(mapRows(rows), safePage, safeSize, hasMore);
+                cachePublicFeed(key, response);
+                return response;
+            } finally {
+                publicFeedFlights.remove(key, lock);
+            }
         }
-        FeedPageResponse response = new FeedPageResponse(mapRows(rows), safePage, safeSize, hasMore);
-        feedPublicCache.put(key, response);
-        writeRedis(key, response, cacheProperties.getPublicFeedTtl().getSeconds());
-        return response;
     }
 
     @Override
@@ -106,7 +130,23 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
     @Override
     public void invalidatePublicFeed() {
         feedPublicCache.invalidateAll();
+        publicFeedPageItems.clear();
+        publicFeedItemPages.clear();
         deleteRedisByPrefix("feed:public:");
+    }
+
+    @Override
+    public void invalidatePublicFeedForPost(long postId) {
+        Set<String> keysToInvalidate = new HashSet<>();
+        keysToInvalidate.addAll(firstPublicPageKeys());
+        Set<String> tracked = publicFeedItemPages.get(postId);
+        if (tracked != null) {
+            keysToInvalidate.addAll(tracked);
+        }
+        for (String key : keysToInvalidate) {
+            invalidatePublicPage(key);
+        }
+        deleteRedisByPrefix("feed:public:1:");
     }
 
     @Override
@@ -163,6 +203,10 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         return Math.min(Math.max(size, 1), 50);
     }
 
+    private String publicFeedKey(int page, int size) {
+        return "feed:public:" + page + ":" + size;
+    }
+
     private FeedPageResponse readRedis(String key) {
         if (!cacheProperties.isRedisEnabled()) {
             return null;
@@ -185,6 +229,83 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         try {
             String json = objectMapper.writeValueAsString(response);
             stringRedisTemplate.opsForValue().set(key, json, java.time.Duration.ofSeconds(ttlSeconds));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void cachePublicFeed(String key, FeedPageResponse response) {
+        feedPublicCache.put(key, response);
+        trackPublicPage(key, response.items());
+        writeRedis(key, response, cacheProperties.getPublicFeedTtl().getSeconds());
+    }
+
+    private void trackPublicPage(String key, List<FeedItemResponse> items) {
+        removeTrackedPublicPage(key);
+        Set<Long> itemIds = ConcurrentHashMap.newKeySet();
+        for (FeedItemResponse item : items) {
+            Long itemId = parseId(item.id());
+            if (itemId == null) {
+                continue;
+            }
+            itemIds.add(itemId);
+            publicFeedItemPages.computeIfAbsent(itemId, ignored -> ConcurrentHashMap.newKeySet()).add(key);
+        }
+        if (!itemIds.isEmpty()) {
+            publicFeedPageItems.put(key, itemIds);
+        }
+    }
+
+    private void invalidatePublicPage(String key) {
+        feedPublicCache.invalidate(key);
+        removeTrackedPublicPage(key);
+        deleteRedisKey(key);
+    }
+
+    private void removeTrackedPublicPage(String key) {
+        Set<Long> previousItems = publicFeedPageItems.remove(key);
+        if (previousItems == null) {
+            return;
+        }
+        for (Long itemId : previousItems) {
+            Set<String> pages = publicFeedItemPages.get(itemId);
+            if (pages == null) {
+                continue;
+            }
+            pages.remove(key);
+            if (pages.isEmpty()) {
+                publicFeedItemPages.remove(itemId, pages);
+            }
+        }
+    }
+
+    private Set<String> firstPublicPageKeys() {
+        Set<String> keys = new HashSet<>();
+        keys.addAll(feedPublicCache.asMap().keySet().stream()
+                .filter(key -> key.startsWith("feed:public:1:"))
+                .toList());
+        keys.addAll(publicFeedPageItems.keySet().stream()
+                .filter(key -> key.startsWith("feed:public:1:"))
+                .toList());
+        return keys;
+    }
+
+    private Long parseId(String id) {
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(id);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    private void deleteRedisKey(String key) {
+        if (!cacheProperties.isRedisEnabled()) {
+            return;
+        }
+        try {
+            stringRedisTemplate.delete(key);
         } catch (Exception ignored) {
         }
     }

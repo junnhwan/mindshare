@@ -71,6 +71,39 @@ class KnowPostFeedServiceTest {
     }
 
     @Test
+    void shouldKeepUnrelatedPublicFeedPagesCachedWhenAnotherPostUpdates() {
+        long oldestId = createPublishedPost("Page One");
+        createPublishedPost("Page Two");
+        long newestId = createPublishedPost("Page Three");
+
+        FeedPageResponse thirdPage = knowPostFeedService.getPublicFeed(3, 1, null);
+        assertThat(thirdPage.items()).hasSize(1);
+        assertThat(thirdPage.items().getFirst().title()).isEqualTo("Page One");
+
+        jdbcTemplate.update("UPDATE know_posts SET title = ?, update_time = CURRENT_TIMESTAMP WHERE id = ?", "Direct DB Page One", oldestId);
+
+        knowPostService.updateMetadata(
+                8201L,
+                newestId,
+                "Page Three Updated",
+                1L,
+                List.of("java"),
+                List.of("https://cdn.example.com/cover.png"),
+                "public",
+                false,
+                "updated"
+        );
+
+        FeedPageResponse cachedThirdPage = knowPostFeedService.getPublicFeed(3, 1, null);
+        assertThat(cachedThirdPage.items()).hasSize(1);
+        assertThat(cachedThirdPage.items().getFirst().title()).isEqualTo("Page One");
+
+        FeedPageResponse refreshedFirstPage = knowPostFeedService.getPublicFeed(1, 1, null);
+        assertThat(refreshedFirstPage.items()).hasSize(1);
+        assertThat(refreshedFirstPage.items().getFirst().title()).isEqualTo("Page Three Updated");
+    }
+
+    @Test
     void shouldInvalidateDetailCacheAfterPublishAndDelete() {
         long id = knowPostService.createDraft(8201L);
         knowPostService.confirmContent(8201L, id, "posts/" + id + "/content.md", "etag-1", 128L, "sha-1");
