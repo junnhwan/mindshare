@@ -1,14 +1,12 @@
 package com.mindshare.counter.service.impl;
 
 import com.mindshare.counter.config.CounterProperties;
+import com.mindshare.counter.event.CounterEvent;
+import com.mindshare.counter.event.CounterEventProducer;
 import com.mindshare.counter.schema.BitmapShard;
 import com.mindshare.counter.schema.CounterKeys;
 import com.mindshare.counter.schema.CounterSchema;
 import com.mindshare.counter.service.CounterService;
-import com.mindshare.counter.service.UserCounterService;
-import com.mindshare.knowpost.mapper.KnowPostMapper;
-import com.mindshare.knowpost.model.KnowPost;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -30,61 +28,25 @@ public class CounterServiceImpl implements CounterService {
 
     private static final String TOGGLE_LUA = """
             local bmKey = KEYS[1]
-            local sdsKey = KEYS[2]
             local offset = tonumber(ARGV[1])
             local op = ARGV[2]
-            local idx = tonumber(ARGV[3])
-            local schemaLen = tonumber(ARGV[4])
-            local fieldSize = tonumber(ARGV[5])
-            
-            local function read32be(s, off)
-              local b1, b2, b3, b4 = string.byte(s, off + 1, off + 4)
-              return ((b1 or 0) * 16777216) + ((b2 or 0) * 65536) + ((b3 or 0) * 256) + (b4 or 0)
-            end
-            
-            local function write32be(n)
-              local value = math.max(0, n)
-              local b1 = math.floor(value / 16777216) % 256
-              local b2 = math.floor(value / 65536) % 256
-              local b3 = math.floor(value / 256) % 256
-              local b4 = value % 256
-              return string.char(b1, b2, b3, b4)
-            end
             
             local prev = redis.call('GETBIT', bmKey, offset)
-            local delta = 0
             if op == 'add' then
               if prev == 1 then return 0 end
               redis.call('SETBIT', bmKey, offset, 1)
-              delta = 1
             elseif op == 'remove' then
               if prev == 0 then return 0 end
               redis.call('SETBIT', bmKey, offset, 0)
-              delta = -1
             else
               return -1
             end
-            
-            local len = schemaLen * fieldSize
-            local sds = redis.call('GET', sdsKey)
-            if not sds then
-              sds = string.rep(string.char(0), len)
-            end
-            
-            local off = idx * fieldSize
-            local current = read32be(sds, off)
-            local next = current + delta
-            if next < 0 then next = 0 end
-            local seg = write32be(next)
-            sds = string.sub(sds, 1, off) .. seg .. string.sub(sds, off + fieldSize + 1)
-            redis.call('SET', sdsKey, sds)
             return 1
             """;
 
     private final StringRedisTemplate redisTemplate;
     private final CounterProperties counterProperties;
-    private final KnowPostMapper knowPostMapper;
-    private final ObjectProvider<UserCounterService> userCounterServiceProvider;
+    private final CounterEventProducer counterEventProducer;
     private final DefaultRedisScript<Long> toggleScript;
     private final ConcurrentMap<String, Set<Long>> likeFacts = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Set<Long>> favFacts = new ConcurrentHashMap<>();
@@ -92,13 +54,11 @@ public class CounterServiceImpl implements CounterService {
     public CounterServiceImpl(
             StringRedisTemplate redisTemplate,
             CounterProperties counterProperties,
-            KnowPostMapper knowPostMapper,
-            ObjectProvider<UserCounterService> userCounterServiceProvider
+            CounterEventProducer counterEventProducer
     ) {
         this.redisTemplate = redisTemplate;
         this.counterProperties = counterProperties;
-        this.knowPostMapper = knowPostMapper;
-        this.userCounterServiceProvider = userCounterServiceProvider;
+        this.counterEventProducer = counterEventProducer;
         this.toggleScript = new DefaultRedisScript<>();
         this.toggleScript.setResultType(Long.class);
         this.toggleScript.setScriptText(TOGGLE_LUA);
@@ -189,7 +149,7 @@ public class CounterServiceImpl implements CounterService {
         if (!isRedisEnabled()) {
             boolean changed = toggleInMemory(metric, entityType, entityId, userId, add);
             if (changed) {
-                updateAuthorCounters(metric, entityId, add);
+                publishEvent(entityType, entityId, metric, idx, userId, add ? 1 : -1);
             }
             return changed;
         }
@@ -198,25 +158,19 @@ public class CounterServiceImpl implements CounterService {
         try {
             Long changed = redisTemplate.execute(
                     toggleScript,
-                    List.of(
-                            CounterKeys.bitmapKey(metric, entityType, entityId, chunk),
-                            CounterKeys.sdsKey(entityType, entityId)
-                    ),
+                    List.of(CounterKeys.bitmapKey(metric, entityType, entityId, chunk)),
                     String.valueOf(bit),
-                    add ? "add" : "remove",
-                    String.valueOf(idx),
-                    String.valueOf(CounterSchema.SCHEMA_LEN),
-                    String.valueOf(CounterSchema.FIELD_SIZE)
+                    add ? "add" : "remove"
             );
             boolean updated = changed != null && changed == 1L;
             if (updated) {
-                updateAuthorCounters(metric, entityId, add);
+                publishEvent(entityType, entityId, metric, idx, userId, add ? 1 : -1);
             }
             return updated;
         } catch (Exception exception) {
             boolean changed = toggleInMemory(metric, entityType, entityId, userId, add);
             if (changed) {
-                updateAuthorCounters(metric, entityId, add);
+                publishEvent(entityType, entityId, metric, idx, userId, add ? 1 : -1);
             }
             return changed;
         }
@@ -308,32 +262,7 @@ public class CounterServiceImpl implements CounterService {
         return counterProperties.isRedisEnabled();
     }
 
-    private void updateAuthorCounters(String metric, String entityId, boolean add) {
-        UserCounterService userCounterService = userCounterServiceProvider.getIfAvailable();
-        if (userCounterService == null) {
-            return;
-        }
-        Long knowPostId = parseKnowPostId(entityId);
-        if (knowPostId == null) {
-            return;
-        }
-        KnowPost knowPost = knowPostMapper.findById(knowPostId);
-        if (knowPost == null || knowPost.getCreatorId() == null) {
-            return;
-        }
-        int delta = add ? 1 : -1;
-        if ("like".equals(metric)) {
-            userCounterService.incrementLikesReceived(knowPost.getCreatorId(), delta);
-        } else if ("fav".equals(metric)) {
-            userCounterService.incrementFavsReceived(knowPost.getCreatorId(), delta);
-        }
-    }
-
-    private Long parseKnowPostId(String entityId) {
-        try {
-            return Long.parseLong(entityId);
-        } catch (NumberFormatException exception) {
-            return null;
-        }
+    private void publishEvent(String entityType, String entityId, String metric, int idx, long userId, int delta) {
+        counterEventProducer.publish(CounterEvent.of(entityType, entityId, metric, idx, userId, delta));
     }
 }
