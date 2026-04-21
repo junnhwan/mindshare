@@ -1,5 +1,6 @@
 package com.mindshare.search.service;
 
+import com.mindshare.counter.service.CounterService;
 import com.mindshare.knowpost.service.KnowPostService;
 import com.mindshare.search.api.dto.SearchResponse;
 import com.mindshare.search.api.dto.SuggestResponse;
@@ -28,6 +29,9 @@ class SearchServiceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private CounterService counterService;
 
     @BeforeEach
     void setUp() {
@@ -131,6 +135,21 @@ class SearchServiceTest {
         assertThat(response.items()).hasSize(1);
         assertThat(response.items().getFirst().id()).isEqualTo(String.valueOf(id));
         assertThat(response.items().getFirst().description()).contains("向量检索种子词");
+    }
+
+    @Test
+    void shouldReturnRealInteractionStateInSearchResults() {
+        long id = publish("Counter Search Example", "counter aware search", List.of("java", "search"));
+
+        assertThat(counterService.like("knowpost", String.valueOf(id), 8301L)).isTrue();
+        assertThat(counterService.fav("knowpost", String.valueOf(id), 8301L)).isTrue();
+
+        SearchResponse response = searchService.search("Counter Search", 20, null, null, 8301L);
+        assertThat(response.items()).hasSize(1);
+        assertThat(response.items().getFirst().likeCount()).isEqualTo(1L);
+        assertThat(response.items().getFirst().favoriteCount()).isEqualTo(1L);
+        assertThat(response.items().getFirst().liked()).isTrue();
+        assertThat(response.items().getFirst().faved()).isTrue();
     }
 
     private long publish(String title, String description, List<String> tags) {

@@ -7,6 +7,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.mindshare.cache.config.CacheProperties;
 import com.mindshare.common.exception.BusinessException;
 import com.mindshare.common.exception.ErrorCode;
+import com.mindshare.counter.service.CounterService;
 import com.mindshare.knowpost.api.dto.DescriptionSuggestResponse;
 import com.mindshare.knowpost.api.dto.FeedItemResponse;
 import com.mindshare.knowpost.api.dto.FeedPageResponse;
@@ -29,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -45,6 +47,7 @@ public class KnowPostServiceImpl implements KnowPostService {
     private final StringRedisTemplate stringRedisTemplate;
     private final Cache<String, KnowPostDetailResponse> knowPostDetailCache;
     private final SearchIndexService searchIndexService;
+    private final CounterService counterService;
     private final ConcurrentMap<String, Object> detailFlights = new ConcurrentHashMap<>();
 
     public KnowPostServiceImpl(
@@ -56,7 +59,8 @@ public class KnowPostServiceImpl implements KnowPostService {
             CacheProperties cacheProperties,
             StringRedisTemplate stringRedisTemplate,
             @Qualifier("knowPostDetailCache") Cache<String, KnowPostDetailResponse> knowPostDetailCache,
-            SearchIndexService searchIndexService
+            SearchIndexService searchIndexService,
+            CounterService counterService
     ) {
         this.knowPostMapper = knowPostMapper;
         this.idGenerator = idGenerator;
@@ -67,6 +71,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         this.stringRedisTemplate = stringRedisTemplate;
         this.knowPostDetailCache = knowPostDetailCache;
         this.searchIndexService = searchIndexService;
+        this.counterService = counterService;
     }
 
     @Override
@@ -191,24 +196,24 @@ public class KnowPostServiceImpl implements KnowPostService {
         String cacheKey = detailCacheKey(id);
         KnowPostDetailResponse cached = knowPostDetailCache.getIfPresent(cacheKey);
         if (cached != null) {
-            return cached;
+            return enrichDetailResponse(cached, currentUserIdNullable);
         }
         KnowPostDetailResponse redisCached = readDetailRedis(cacheKey);
         if (redisCached != null) {
             knowPostDetailCache.put(cacheKey, redisCached);
-            return redisCached;
+            return enrichDetailResponse(redisCached, currentUserIdNullable);
         }
         Object lock = detailFlights.computeIfAbsent(cacheKey, ignored -> new Object());
         synchronized (lock) {
             try {
                 KnowPostDetailResponse localAgain = knowPostDetailCache.getIfPresent(cacheKey);
                 if (localAgain != null) {
-                    return localAgain;
+                    return enrichDetailResponse(localAgain, currentUserIdNullable);
                 }
                 KnowPostDetailResponse redisAgain = readDetailRedis(cacheKey);
                 if (redisAgain != null) {
                     knowPostDetailCache.put(cacheKey, redisAgain);
-                    return redisAgain;
+                    return enrichDetailResponse(redisAgain, currentUserIdNullable);
                 }
 
                 KnowPostDetailRow row = knowPostMapper.findDetailById(id);
@@ -244,7 +249,7 @@ public class KnowPostServiceImpl implements KnowPostService {
                 );
                 knowPostDetailCache.put(cacheKey, response);
                 writeDetailRedis(cacheKey, response);
-                return response;
+                return enrichDetailResponse(response, currentUserIdNullable);
             } finally {
                 detailFlights.remove(cacheKey, lock);
             }
@@ -379,5 +384,35 @@ public class KnowPostServiceImpl implements KnowPostService {
             stringRedisTemplate.opsForValue().set(key, json, cacheProperties.getDetailTtl());
         } catch (Exception ignored) {
         }
+    }
+
+    private KnowPostDetailResponse enrichDetailResponse(KnowPostDetailResponse response, Long currentUserIdNullable) {
+        Map<String, Long> counts = counterService.getCounts("knowpost", response.id(), List.of("like", "fav"));
+        Boolean liked = currentUserIdNullable == null
+                ? null
+                : counterService.isLiked("knowpost", response.id(), currentUserIdNullable);
+        Boolean faved = currentUserIdNullable == null
+                ? null
+                : counterService.isFaved("knowpost", response.id(), currentUserIdNullable);
+        return new KnowPostDetailResponse(
+                response.id(),
+                response.title(),
+                response.description(),
+                response.contentUrl(),
+                response.images(),
+                response.tags(),
+                response.authorId(),
+                response.authorAvatar(),
+                response.authorNickname(),
+                response.authorTagJson(),
+                counts.getOrDefault("like", 0L),
+                counts.getOrDefault("fav", 0L),
+                liked,
+                faved,
+                response.isTop(),
+                response.visible(),
+                response.type(),
+                response.publishTime()
+        );
     }
 }

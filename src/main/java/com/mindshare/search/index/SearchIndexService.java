@@ -8,6 +8,7 @@ import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mindshare.config.ElasticsearchConfig;
+import com.mindshare.counter.service.CounterService;
 import com.mindshare.knowpost.api.dto.FeedItemResponse;
 import com.mindshare.knowpost.mapper.KnowPostMapper;
 import com.mindshare.knowpost.model.KnowPostDetailRow;
@@ -46,6 +47,7 @@ public class SearchIndexService {
     private final KnowPostMapper knowPostMapper;
     private final ObjectMapper objectMapper;
     private final KnowPostContentLoader knowPostContentLoader;
+    private final CounterService counterService;
     private final ConcurrentMap<Long, SearchDocument> inMemoryDocuments = new ConcurrentHashMap<>();
 
     public SearchIndexService(
@@ -53,13 +55,15 @@ public class SearchIndexService {
             ElasticsearchConfig.MindShareElasticsearchProperties elasticsearchProperties,
             KnowPostMapper knowPostMapper,
             ObjectMapper objectMapper,
-            KnowPostContentLoader knowPostContentLoader
+            KnowPostContentLoader knowPostContentLoader,
+            CounterService counterService
     ) {
         this.elasticsearchClientProvider = elasticsearchClientProvider;
         this.elasticsearchProperties = elasticsearchProperties;
         this.knowPostMapper = knowPostMapper;
         this.objectMapper = objectMapper;
         this.knowPostContentLoader = knowPostContentLoader;
+        this.counterService = counterService;
     }
 
     public void initialize() {
@@ -118,11 +122,11 @@ public class SearchIndexService {
         ElasticsearchClient client = elasticsearchClient();
         if (client != null) {
             try {
-                return searchWithElasticsearch(client, keyword, safeSize, tagsCsv, after);
+                return searchWithElasticsearch(client, keyword, safeSize, tagsCsv, after, currentUserIdNullable);
             } catch (Exception ignored) {
             }
         }
-        return searchInMemory(keyword, safeSize, tagsCsv, after);
+        return searchInMemory(keyword, safeSize, tagsCsv, after, currentUserIdNullable);
     }
 
     public SuggestResponse suggest(String prefix, int size) {
@@ -216,7 +220,7 @@ public class SearchIndexService {
         return truncate(content, MAX_BODY_LENGTH);
     }
 
-    private SearchResponse searchInMemory(String keyword, int size, String tagsCsv, String after) {
+    private SearchResponse searchInMemory(String keyword, int size, String tagsCsv, String after, Long currentUserIdNullable) {
         List<String> tags = parseCsv(tagsCsv);
         SearchCursor cursor = decodeCursor(after);
         Comparator<SearchDocument> comparator = searchComparator(keyword);
@@ -235,7 +239,7 @@ public class SearchIndexService {
         String nextAfter = hasMore && !page.isEmpty() ? encodeCursor(cursorFor(page.getLast(), keyword)) : null;
 
         List<FeedItemResponse> items = page.stream()
-                .map(document -> toFeedItem(document, resolveDescription(document, keyword)))
+                .map(document -> toFeedItem(document, resolveDescription(document, keyword), currentUserIdNullable))
                 .toList();
         return new SearchResponse(items, nextAfter, hasMore);
     }
@@ -246,7 +250,8 @@ public class SearchIndexService {
             String keyword,
             int size,
             String tagsCsv,
-            String after
+            String after,
+            Long currentUserIdNullable
     ) throws Exception {
         List<String> tags = parseCsv(tagsCsv);
         SearchCursor cursor = decodeCursor(after);
@@ -287,7 +292,7 @@ public class SearchIndexService {
                     if (source == null) {
                         return null;
                     }
-                    return toFeedItem(source, buildSnippet(hit));
+                    return toFeedItem(source, buildSnippet(hit), currentUserIdNullable);
                 })
                 .filter(Objects::nonNull)
                 .toList();
@@ -336,7 +341,8 @@ public class SearchIndexService {
         return new SuggestResponse(items);
     }
 
-    private FeedItemResponse toFeedItem(SearchDocument document, String description) {
+    private FeedItemResponse toFeedItem(SearchDocument document, String description, Long currentUserIdNullable) {
+        CounterSnapshot counterSnapshot = counterSnapshot(String.valueOf(document.contentId()), currentUserIdNullable);
         return new FeedItemResponse(
                 String.valueOf(document.contentId()),
                 document.title(),
@@ -346,20 +352,22 @@ public class SearchIndexService {
                 document.authorAvatar(),
                 document.authorNickname(),
                 document.authorTagJson(),
-                0L,
-                0L,
-                null,
-                null,
+                counterSnapshot.likeCount(),
+                counterSnapshot.favoriteCount(),
+                counterSnapshot.liked(),
+                counterSnapshot.faved(),
                 document.isTop()
         );
     }
 
-    private FeedItemResponse toFeedItem(Map<String, Object> source, String snippet) {
+    private FeedItemResponse toFeedItem(Map<String, Object> source, String snippet, Long currentUserIdNullable) {
         String description = snippet == null || snippet.isBlank()
                 ? asString(source.get("description"))
                 : snippet;
+        String contentId = asString(source.get("content_id"));
+        CounterSnapshot counterSnapshot = counterSnapshot(contentId, currentUserIdNullable);
         return new FeedItemResponse(
-                asString(source.get("content_id")),
+                contentId,
                 asString(source.get("title")),
                 description,
                 asStringList(source.get("img_urls")).stream().findFirst().orElse(null),
@@ -367,10 +375,10 @@ public class SearchIndexService {
                 asString(source.get("author_avatar")),
                 asString(source.get("author_nickname")),
                 asString(source.get("author_tag_json")),
-                0L,
-                0L,
-                null,
-                null,
+                counterSnapshot.likeCount(),
+                counterSnapshot.favoriteCount(),
+                counterSnapshot.liked(),
+                counterSnapshot.faved(),
                 asBoolean(source.get("is_top"))
         );
     }
@@ -564,6 +572,18 @@ public class SearchIndexService {
         return value == null ? null : String.valueOf(value);
     }
 
+    private CounterSnapshot counterSnapshot(String contentId, Long currentUserIdNullable) {
+        Map<String, Long> counts = counterService.getCounts("knowpost", contentId, List.of("like", "fav"));
+        boolean liked = currentUserIdNullable != null && counterService.isLiked("knowpost", contentId, currentUserIdNullable);
+        boolean faved = currentUserIdNullable != null && counterService.isFaved("knowpost", contentId, currentUserIdNullable);
+        return new CounterSnapshot(
+                counts.getOrDefault("like", 0L),
+                counts.getOrDefault("fav", 0L),
+                currentUserIdNullable == null ? null : liked,
+                currentUserIdNullable == null ? null : faved
+        );
+    }
+
     private Boolean asBoolean(Object value) {
         if (value instanceof Boolean bool) {
             return bool;
@@ -688,5 +708,13 @@ public class SearchIndexService {
             map.put("title_suggest", titleSuggest);
             return map;
         }
+    }
+
+    private record CounterSnapshot(
+            Long likeCount,
+            Long favoriteCount,
+            Boolean liked,
+            Boolean faved
+    ) {
     }
 }

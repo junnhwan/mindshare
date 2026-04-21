@@ -2,6 +2,7 @@ package com.mindshare.knowpost.service;
 
 import com.mindshare.common.exception.BusinessException;
 import com.mindshare.common.exception.ErrorCode;
+import com.mindshare.counter.service.CounterService;
 import com.mindshare.knowpost.api.dto.FeedPageResponse;
 import com.mindshare.knowpost.api.dto.KnowPostDetailResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +29,9 @@ class KnowPostFeedServiceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private CounterService counterService;
 
     @BeforeEach
     void setUp() {
@@ -134,6 +138,27 @@ class KnowPostFeedServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.BAD_REQUEST);
+    }
+
+    @Test
+    void shouldReturnRealInteractionStateInFeedAndDetail() {
+        long id = createPublishedPost("Interactive Title");
+
+        assertThat(counterService.like("knowpost", String.valueOf(id), 8201L)).isTrue();
+        assertThat(counterService.fav("knowpost", String.valueOf(id), 8201L)).isTrue();
+
+        FeedPageResponse feed = knowPostFeedService.getPublicFeed(1, 20, 8201L);
+        assertThat(feed.items()).hasSize(1);
+        assertThat(feed.items().getFirst().likeCount()).isEqualTo(1L);
+        assertThat(feed.items().getFirst().favoriteCount()).isEqualTo(1L);
+        assertThat(feed.items().getFirst().liked()).isTrue();
+        assertThat(feed.items().getFirst().faved()).isTrue();
+
+        KnowPostDetailResponse detail = knowPostService.getDetail(id, 8201L);
+        assertThat(detail.likeCount()).isEqualTo(1L);
+        assertThat(detail.favoriteCount()).isEqualTo(1L);
+        assertThat(detail.liked()).isTrue();
+        assertThat(detail.faved()).isTrue();
     }
 
     private long createPublishedPost(String title) {

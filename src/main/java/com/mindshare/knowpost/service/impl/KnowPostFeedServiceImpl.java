@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.mindshare.cache.config.CacheProperties;
+import com.mindshare.counter.service.CounterService;
 import com.mindshare.knowpost.api.dto.FeedItemResponse;
 import com.mindshare.knowpost.api.dto.FeedPageResponse;
 import com.mindshare.knowpost.mapper.KnowPostMapper;
@@ -18,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -32,6 +34,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
     private final StringRedisTemplate stringRedisTemplate;
     private final Cache<String, FeedPageResponse> feedPublicCache;
     private final Cache<String, FeedPageResponse> feedMineCache;
+    private final CounterService counterService;
     private final ConcurrentMap<String, Object> publicFeedFlights = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Set<Long>> publicFeedPageItems = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, Set<String>> publicFeedItemPages = new ConcurrentHashMap<>();
@@ -41,6 +44,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
             ObjectMapper objectMapper,
             CacheProperties cacheProperties,
             StringRedisTemplate stringRedisTemplate,
+            CounterService counterService,
             @Qualifier("feedPublicCache") Cache<String, FeedPageResponse> feedPublicCache,
             @Qualifier("feedMineCache") Cache<String, FeedPageResponse> feedMineCache
     ) {
@@ -48,6 +52,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         this.objectMapper = objectMapper;
         this.cacheProperties = cacheProperties;
         this.stringRedisTemplate = stringRedisTemplate;
+        this.counterService = counterService;
         this.feedPublicCache = feedPublicCache;
         this.feedMineCache = feedMineCache;
     }
@@ -60,13 +65,13 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
 
         FeedPageResponse local = feedPublicCache.getIfPresent(key);
         if (local != null) {
-            return local;
+            return enrichResponse(local, currentUserIdNullable);
         }
 
         FeedPageResponse cached = readRedis(key);
         if (cached != null) {
             cachePublicFeed(key, cached);
-            return cached;
+            return enrichResponse(cached, currentUserIdNullable);
         }
 
         Object lock = publicFeedFlights.computeIfAbsent(key, ignored -> new Object());
@@ -74,13 +79,13 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
             try {
                 FeedPageResponse localAgain = feedPublicCache.getIfPresent(key);
                 if (localAgain != null) {
-                    return localAgain;
+                    return enrichResponse(localAgain, currentUserIdNullable);
                 }
 
                 FeedPageResponse redisAgain = readRedis(key);
                 if (redisAgain != null) {
                     cachePublicFeed(key, redisAgain);
-                    return redisAgain;
+                    return enrichResponse(redisAgain, currentUserIdNullable);
                 }
 
                 int offset = (safePage - 1) * safeSize;
@@ -91,7 +96,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
                 }
                 FeedPageResponse response = new FeedPageResponse(mapRows(rows), safePage, safeSize, hasMore);
                 cachePublicFeed(key, response);
-                return response;
+                return enrichResponse(response, currentUserIdNullable);
             } finally {
                 publicFeedFlights.remove(key, lock);
             }
@@ -106,13 +111,13 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
 
         FeedPageResponse local = feedMineCache.getIfPresent(key);
         if (local != null) {
-            return local;
+            return enrichResponse(local, creatorId);
         }
 
         FeedPageResponse cached = readRedis(key);
         if (cached != null) {
             feedMineCache.put(key, cached);
-            return cached;
+            return enrichResponse(cached, creatorId);
         }
 
         int offset = (safePage - 1) * safeSize;
@@ -124,7 +129,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         FeedPageResponse response = new FeedPageResponse(mapRows(rows), safePage, safeSize, hasMore);
         feedMineCache.put(key, response);
         writeRedis(key, response, cacheProperties.getMyFeedTtl().getSeconds());
-        return response;
+        return enrichResponse(response, creatorId);
     }
 
     @Override
@@ -237,6 +242,40 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         feedPublicCache.put(key, response);
         trackPublicPage(key, response.items());
         writeRedis(key, response, cacheProperties.getPublicFeedTtl().getSeconds());
+    }
+
+    private FeedPageResponse enrichResponse(FeedPageResponse response, Long currentUserIdNullable) {
+        List<String> entityIds = response.items().stream()
+                .map(FeedItemResponse::id)
+                .toList();
+        Map<String, Map<String, Long>> countsBatch = counterService.getCountsBatch("knowpost", entityIds, List.of("like", "fav"));
+        List<FeedItemResponse> enrichedItems = response.items().stream()
+                .map(item -> {
+                    Map<String, Long> counts = countsBatch.getOrDefault(item.id(), Map.of());
+                    Boolean liked = currentUserIdNullable == null
+                            ? null
+                            : counterService.isLiked("knowpost", item.id(), currentUserIdNullable);
+                    Boolean faved = currentUserIdNullable == null
+                            ? null
+                            : counterService.isFaved("knowpost", item.id(), currentUserIdNullable);
+                    return new FeedItemResponse(
+                            item.id(),
+                            item.title(),
+                            item.description(),
+                            item.coverImage(),
+                            item.tags(),
+                            item.authorAvatar(),
+                            item.authorNickname(),
+                            item.tagJson(),
+                            counts.getOrDefault("like", 0L),
+                            counts.getOrDefault("fav", 0L),
+                            liked,
+                            faved,
+                            item.isTop()
+                    );
+                })
+                .toList();
+        return new FeedPageResponse(enrichedItems, response.page(), response.size(), response.hasMore());
     }
 
     private void trackPublicPage(String key, List<FeedItemResponse> items) {
