@@ -11,6 +11,41 @@ Authentication:
 - protected endpoints expect a Bearer token issued by `/api/v1/auth/login` or `/api/v1/auth/register`
 - tests currently use JWT mocks; real runtime uses the configured RSA keys
 
+## Counter
+
+### `POST /api/v1/action/like`
+
+Protected action endpoint.
+
+### `POST /api/v1/action/unlike`
+
+Protected action endpoint.
+
+### `POST /api/v1/action/fav`
+
+Protected action endpoint.
+
+### `POST /api/v1/action/unfav`
+
+Protected action endpoint.
+
+Request body for all four action endpoints:
+
+- `entityType`
+- `entityId`
+
+Current supported entity type:
+
+- `knowpost`
+
+### `GET /api/v1/counter/{etype}/{eid}`
+
+Public read endpoint for current counter totals.
+
+Query params:
+
+- `metrics` optional, comma-separated, currently supports `like,fav`
+
 ## Auth
 
 ### `POST /api/v1/auth/send-code`
@@ -174,6 +209,7 @@ Current behavior:
 - reads real body text from `content_url`
 - uses cursor-style `after` token rather than page number
 - returns a snippet when body content matches the keyword
+- returns real `likeCount / favoriteCount / liked / faved`
 
 ### `GET /api/v1/search/suggest`
 
@@ -188,7 +224,8 @@ Current behavior:
 
 ## Known Phase-One Limits
 
-- interaction counters are still placeholders
+- counter currently uses the smallest replica slice, not the full Kafka aggregation chain yet
+- user-dimension counters are not implemented yet
 - follow/relation APIs do not exist yet
 - AI/RAG APIs do not exist yet
 - search ranking is not yet wired to real counter signals

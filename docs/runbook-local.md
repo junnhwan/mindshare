@@ -152,7 +152,8 @@ Current cache usage:
 
 Still not available in local runtime:
 
-- counter service and real liked/faved counts
+- counter Kafka aggregation / rebuild chain
+- user-dimension counters
 - relation APIs
 - outbox/kafka/canal pipeline
 - LLM description generation

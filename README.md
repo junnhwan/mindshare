@@ -6,6 +6,7 @@ step by step with the reference project `zhiguang_be`.
 Current implemented scope:
 
 - `auth`
+- `counter`
 - `profile`
 - `storage`
 - `knowpost`
@@ -14,7 +15,6 @@ Current implemented scope:
 
 Current not-yet-implemented full-replica modules:
 
-- `counter`
 - `relation`
 - `outbox + kafka + canal`
 - `llm / rag`
@@ -25,6 +25,7 @@ The repository is beyond bootstrap and already contains a runnable phase-one
 backend with these behaviors:
 
 - auth: send code, register, login, refresh token, logout, reset password, `/me`
+- counter: like/unlike, fav/unfav, counter query, real counts wired into feed/detail/search
 - profile: current profile query, patch profile, avatar upload
 - storage: knowpost ownership-guarded OSS presign upload
 - knowpost: draft create, content confirm, metadata patch, publish, delete, detail
@@ -139,6 +140,6 @@ Planned later tables for full alignment:
 
 Recommended next order after the current phase-one improvements:
 
-1. `counter`
+1. finish `counter` aggregation, rebuild, and user-dimension counters
 2. `relation + outbox + kafka + canal`
 3. `llm / rag`

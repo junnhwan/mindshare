@@ -24,6 +24,7 @@
 当前项目已经具备以下能力：
 
 - `auth`：验证码发送、注册、登录、刷新、登出、重置密码、`/me`
+- `counter`：点赞/收藏动作接口、计数查询接口、`feed/detail/search` 的真实互动回填
 - `profile`：当前用户资料查询与资料修改
 - `storage`：基于帖子所有权校验的 OSS 预签名上传
 - `knowpost`：草稿创建、内容确认、元数据修改、发布、删除、详情、公开 feed、我的 feed
@@ -40,6 +41,7 @@
 - 搜索命中正文时已返回正文片段，而不只是原始 description
 - `knowpost` 的 publish / update / delete 已会同步触发搜索索引更新
 - `profile` 已补齐 `POST /api/v1/profile/avatar`
+- `counter` 已补齐 like/fav 动作接口和计数查询接口
 - `feed` / `detail` 已有基础缓存、single-flight 与更细粒度的 public feed 失效机制
 
 这意味着项目已经不是“只有接口壳子”的状态，而是进入了“可以演示，但还没完整复刻”的阶段。
@@ -50,7 +52,7 @@
 
 这些模块在参考项目中已经存在，但 `mindshare` 当前还没有落地：
 
-### 3.1.1 `counter`
+### 3.1.1 `counter` 仍未完整对齐
 
 参考项目已有：
 
@@ -61,18 +63,23 @@
 - `counter/event/*`
 - `counter/schema/*`
 
-当前缺失：
+当前已经具备：
 
 - 点赞/收藏动作接口
 - 内容维度计数读取接口
+- 位图事实层的最小可运行版
+- `feed`、`detail`、`search` 的真实 `likeCount / favoriteCount / liked / faved`
+
+当前仍缺：
+
 - 用户维度计数体系
-- 位图事实层
 - Kafka 聚合与重建机制
+- 更接近参考项目的 SDS 异常重建与聚合链路
 
 直接影响：
 
-- `feed`、`detail`、`search` 里的 `likeCount / favoriteCount / liked / faved` 仍然是占位值
-- 还没有原项目的高并发计数设计亮点
+- 当前项目已经不再是互动计数全占位
+- 但还没有原项目的高并发聚合和重建设计亮点
 
 ### 3.1.2 `relation`
 
@@ -248,9 +255,6 @@
 
 当前差距包括：
 
-- `README.md` 仍然非常简短，基本还是 bootstrap 级别说明
-- 没有完整的本地运行文档
-- 没有 phase-one API 文档
 - 没有 Kafka / Canal / ES / Redis / MySQL / LLM 的整体运行说明
 - 缺少更强的集成测试分层
 
@@ -261,18 +265,17 @@
 
 ## 4. 当前最关键的“未完成清单”
 
-如果把“和完整原项目的差距”压缩成一份最关键待办，可以归纳为下面 10 条：
+如果把“和完整原项目的差距”压缩成一份最关键待办，可以归纳为下面 9 条：
 
-1. 补齐 `counter` 模块
+1. 补齐 `counter` 的 Kafka 聚合、重建和用户维度计数
 2. 补齐 `relation` 模块
 3. 补齐 `outbox + kafka + canal` 链路
 4. 补齐 `llm / rag`
 5. 把 `search` 排序升级为“相关性 + 业务权重”
 6. 把 `feed/detail` 缓存升级到原项目级别的三级缓存
 7. 把 `profile` 的更完整资料字段和约束补齐
-8. 把 `like/favorite/follow` 等真实互动状态接入返回模型
-9. 把搜索、关系、计数切到异步事件驱动风格
-10. 持续补齐 README、运行手册、接口文档和环境说明
+8. 把搜索、关系、计数切到异步事件驱动风格
+9. 持续补齐 README、运行手册、接口文档和环境说明
 
 ## 5. 建议的后续对齐顺序
 
@@ -291,11 +294,11 @@
 
 - 这部分都基于现有模块，收益高、上下文连续、返工成本低
 
-### P1：补 `counter`
+### P1：补完 `counter`
 
 原因：
 
-- `feed/detail/search` 的真实表现都依赖 `counter`
+- `feed/detail/search` 的真实表现已经开始依赖 `counter`
 - 这是后续很多模块的基础设施
 
 ### P2：补 `relation + outbox + kafka + canal`
