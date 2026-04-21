@@ -5,6 +5,10 @@ import com.mindshare.counter.schema.BitmapShard;
 import com.mindshare.counter.schema.CounterKeys;
 import com.mindshare.counter.schema.CounterSchema;
 import com.mindshare.counter.service.CounterService;
+import com.mindshare.counter.service.UserCounterService;
+import com.mindshare.knowpost.mapper.KnowPostMapper;
+import com.mindshare.knowpost.model.KnowPost;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -79,13 +83,22 @@ public class CounterServiceImpl implements CounterService {
 
     private final StringRedisTemplate redisTemplate;
     private final CounterProperties counterProperties;
+    private final KnowPostMapper knowPostMapper;
+    private final ObjectProvider<UserCounterService> userCounterServiceProvider;
     private final DefaultRedisScript<Long> toggleScript;
     private final ConcurrentMap<String, Set<Long>> likeFacts = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Set<Long>> favFacts = new ConcurrentHashMap<>();
 
-    public CounterServiceImpl(StringRedisTemplate redisTemplate, CounterProperties counterProperties) {
+    public CounterServiceImpl(
+            StringRedisTemplate redisTemplate,
+            CounterProperties counterProperties,
+            KnowPostMapper knowPostMapper,
+            ObjectProvider<UserCounterService> userCounterServiceProvider
+    ) {
         this.redisTemplate = redisTemplate;
         this.counterProperties = counterProperties;
+        this.knowPostMapper = knowPostMapper;
+        this.userCounterServiceProvider = userCounterServiceProvider;
         this.toggleScript = new DefaultRedisScript<>();
         this.toggleScript.setResultType(Long.class);
         this.toggleScript.setScriptText(TOGGLE_LUA);
@@ -174,7 +187,11 @@ public class CounterServiceImpl implements CounterService {
 
     private boolean toggle(String entityType, String entityId, long userId, String metric, int idx, boolean add) {
         if (!isRedisEnabled()) {
-            return toggleInMemory(metric, entityType, entityId, userId, add);
+            boolean changed = toggleInMemory(metric, entityType, entityId, userId, add);
+            if (changed) {
+                updateAuthorCounters(metric, entityId, add);
+            }
+            return changed;
         }
         long chunk = BitmapShard.chunkOf(userId);
         long bit = BitmapShard.bitOf(userId);
@@ -191,9 +208,17 @@ public class CounterServiceImpl implements CounterService {
                     String.valueOf(CounterSchema.SCHEMA_LEN),
                     String.valueOf(CounterSchema.FIELD_SIZE)
             );
-            return changed != null && changed == 1L;
+            boolean updated = changed != null && changed == 1L;
+            if (updated) {
+                updateAuthorCounters(metric, entityId, add);
+            }
+            return updated;
         } catch (Exception exception) {
-            return toggleInMemory(metric, entityType, entityId, userId, add);
+            boolean changed = toggleInMemory(metric, entityType, entityId, userId, add);
+            if (changed) {
+                updateAuthorCounters(metric, entityId, add);
+            }
+            return changed;
         }
     }
 
@@ -281,5 +306,34 @@ public class CounterServiceImpl implements CounterService {
 
     private boolean isRedisEnabled() {
         return counterProperties.isRedisEnabled();
+    }
+
+    private void updateAuthorCounters(String metric, String entityId, boolean add) {
+        UserCounterService userCounterService = userCounterServiceProvider.getIfAvailable();
+        if (userCounterService == null) {
+            return;
+        }
+        Long knowPostId = parseKnowPostId(entityId);
+        if (knowPostId == null) {
+            return;
+        }
+        KnowPost knowPost = knowPostMapper.findById(knowPostId);
+        if (knowPost == null || knowPost.getCreatorId() == null) {
+            return;
+        }
+        int delta = add ? 1 : -1;
+        if ("like".equals(metric)) {
+            userCounterService.incrementLikesReceived(knowPost.getCreatorId(), delta);
+        } else if ("fav".equals(metric)) {
+            userCounterService.incrementFavsReceived(knowPost.getCreatorId(), delta);
+        }
+    }
+
+    private Long parseKnowPostId(String entityId) {
+        try {
+            return Long.parseLong(entityId);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 }

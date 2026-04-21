@@ -8,6 +8,7 @@ import com.mindshare.cache.config.CacheProperties;
 import com.mindshare.common.exception.BusinessException;
 import com.mindshare.common.exception.ErrorCode;
 import com.mindshare.counter.service.CounterService;
+import com.mindshare.counter.service.UserCounterService;
 import com.mindshare.knowpost.api.dto.DescriptionSuggestResponse;
 import com.mindshare.knowpost.api.dto.FeedItemResponse;
 import com.mindshare.knowpost.api.dto.FeedPageResponse;
@@ -48,6 +49,7 @@ public class KnowPostServiceImpl implements KnowPostService {
     private final Cache<String, KnowPostDetailResponse> knowPostDetailCache;
     private final SearchIndexService searchIndexService;
     private final CounterService counterService;
+    private final UserCounterService userCounterService;
     private final ConcurrentMap<String, Object> detailFlights = new ConcurrentHashMap<>();
 
     public KnowPostServiceImpl(
@@ -60,7 +62,8 @@ public class KnowPostServiceImpl implements KnowPostService {
             StringRedisTemplate stringRedisTemplate,
             @Qualifier("knowPostDetailCache") Cache<String, KnowPostDetailResponse> knowPostDetailCache,
             SearchIndexService searchIndexService,
-            CounterService counterService
+            CounterService counterService,
+            UserCounterService userCounterService
     ) {
         this.knowPostMapper = knowPostMapper;
         this.idGenerator = idGenerator;
@@ -72,6 +75,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         this.knowPostDetailCache = knowPostDetailCache;
         this.searchIndexService = searchIndexService;
         this.counterService = counterService;
+        this.userCounterService = userCounterService;
     }
 
     @Override
@@ -150,6 +154,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "draft not found or no permission");
         }
+        userCounterService.incrementPosts(creatorId, 1);
         invalidateCaches(creatorId, id);
         searchIndexService.upsertKnowPost(id);
     }
@@ -182,9 +187,13 @@ public class KnowPostServiceImpl implements KnowPostService {
     @Override
     @Transactional
     public void delete(long creatorId, long id) {
+        KnowPost existing = knowPostMapper.findById(id);
         int updated = knowPostMapper.softDelete(id, creatorId);
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "draft not found or no permission");
+        }
+        if (existing != null && "published".equalsIgnoreCase(existing.getStatus())) {
+            userCounterService.incrementPosts(creatorId, -1);
         }
         invalidateCaches(creatorId, id);
         searchIndexService.deleteKnowPost(id);
