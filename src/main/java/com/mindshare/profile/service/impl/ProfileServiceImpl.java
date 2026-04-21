@@ -43,6 +43,17 @@ public class ProfileServiceImpl implements ProfileService {
         return map(loadUser(userId));
     }
 
+    @Override
+    @Transactional
+    public ProfileResponse updateAvatar(long userId, String avatarUrl) {
+        loadUser(userId);
+        User patch = new User();
+        patch.setId(userId);
+        patch.setAvatar(avatarUrl);
+        userMapper.updateProfile(patch);
+        return map(loadUser(userId));
+    }
+
     private User loadUser(long userId) {
         User user = userMapper.findById(userId);
         if (user == null) {

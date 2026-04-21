@@ -4,12 +4,16 @@ import com.aliyun.oss.HttpMethod;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
 import com.aliyun.oss.model.GeneratePresignedUrlRequest;
+import com.aliyun.oss.model.PutObjectRequest;
 import com.mindshare.common.exception.BusinessException;
 import com.mindshare.common.exception.ErrorCode;
 import com.mindshare.storage.config.OssProperties;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.net.URL;
+import java.time.Instant;
 import java.util.Date;
 
 @Service
@@ -44,6 +48,31 @@ public class OssStorageService {
         } finally {
             client.shutdown();
         }
+    }
+
+    public String uploadAvatar(long userId, MultipartFile file) {
+        ensureConfigured();
+        String originalFilename = file.getOriginalFilename();
+        String extension = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf('.'));
+        }
+        String objectKey = properties.getBasePath() + "/avatars/" + userId + "-" + Instant.now().toEpochMilli() + extension;
+
+        OSS client = new OSSClientBuilder().build(
+                properties.getEndpoint(),
+                properties.getAccessKeyId(),
+                properties.getAccessKeySecret()
+        );
+        try {
+            PutObjectRequest request = new PutObjectRequest(properties.getBucket(), objectKey, file.getInputStream());
+            client.putObject(request);
+        } catch (IOException exception) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "failed to read avatar file");
+        } finally {
+            client.shutdown();
+        }
+        return publicUrl(objectKey);
     }
 
     public String publicUrl(String objectKey) {

@@ -8,4 +8,6 @@ public interface ProfileService {
     ProfileResponse getCurrentProfile(long userId);
 
     ProfileResponse updateProfile(long userId, ProfilePatchRequest request);
+
+    ProfileResponse updateAvatar(long userId, String avatarUrl);
 }
