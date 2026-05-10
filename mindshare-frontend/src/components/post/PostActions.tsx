@@ -35,7 +35,7 @@ export function PostActions({
 
   const likeMutation = useMutation({
     mutationFn: () =>
-      liked ? unlike({ entityType: "knowpost", entityId: postId }) : like({ entityType: "knowpost", entityId: postId }),
+      liked ? unlike({ entityType: "knowpost", entityId: String(postId) }) : like({ entityType: "knowpost", entityId: String(postId) }),
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["counts", "knowpost", postId] });
       const prev = queryClient.getQueryData<{ like: number; fav: number }>(["counts", "knowpost", postId]);
@@ -58,7 +58,7 @@ export function PostActions({
 
   const favMutation = useMutation({
     mutationFn: () =>
-      faved ? unfav({ entityType: "knowpost", entityId: postId }) : fav({ entityType: "knowpost", entityId: postId }),
+      faved ? unfav({ entityType: "knowpost", entityId: String(postId) }) : fav({ entityType: "knowpost", entityId: String(postId) }),
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["counts", "knowpost", postId] });
       const prev = queryClient.getQueryData<{ like: number; fav: number }>(["counts", "knowpost", postId]);

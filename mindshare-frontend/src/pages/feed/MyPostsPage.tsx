@@ -55,7 +55,7 @@ export function MyPostsPage() {
   });
 
   const topMutation = useMutation({
-    mutationFn: (id: string) => toggleTop(id),
+    mutationFn: ({ id, isTop }: { id: string; isTop: boolean }) => toggleTop(id, isTop),
     onSuccess: () => {
       toast.success("操作成功");
       queryClient.invalidateQueries({ queryKey: ["myPosts"] });
@@ -135,7 +135,7 @@ export function MyPostsPage() {
                   icon={<Pin size={14} />}
                   onClick={(e) => {
                     e.stopPropagation();
-                    topMutation.mutate(String(post.id));
+                    topMutation.mutate({ id: String(post.id), isTop: !post.isTop });
                   }}
                   loading={topMutation.isPending}
                 >

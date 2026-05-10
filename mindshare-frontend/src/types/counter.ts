@@ -7,5 +7,5 @@ export interface CounterData {
 
 export interface ActionRequest {
   entityType: EntityType;
-  entityId: number;
+  entityId: string;
 }

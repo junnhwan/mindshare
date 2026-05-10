@@ -30,18 +30,16 @@ export async function patchMetadata(
 }
 
 /** PATCH /knowposts/{id}/top */
-export async function toggleTop(id: string): Promise<void> {
-  return apiClient.patch(`/knowposts/${id}/top`);
+export async function toggleTop(id: string, isTop: boolean): Promise<void> {
+  return apiClient.patch(`/knowposts/${id}/top`, { isTop });
 }
 
-/** PATCH /knowposts/{id}/visibility?visible=... */
+/** PATCH /knowposts/{id}/visibility */
 export async function setVisibility(
   id: string,
   visible: string,
 ): Promise<void> {
-  return apiClient.patch(`/knowposts/${id}/visibility`, null, {
-    params: { visible },
-  });
+  return apiClient.patch(`/knowposts/${id}/visibility`, { visible });
 }
 
 /** POST /knowposts/{id}/publish */
