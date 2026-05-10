@@ -1,8 +1,6 @@
 package com.mindshare.auth.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mindshare.common.exception.ErrorCode;
-import com.mindshare.common.web.ApiResponse;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -23,9 +21,11 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+
 import java.io.IOException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.Map;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(AuthProperties.class)
@@ -47,15 +47,16 @@ public class SecurityConfig {
                                 "/api/v1/knowposts/detail/**",
                                 "/api/v1/counter/**",
                                 "/api/v1/search",
-                                "/api/v1/search/suggest"
+                                "/api/v1/search/suggest",
+                                "/actuator/health"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(handler -> handler
                         .authenticationEntryPoint((request, response, exception) ->
-                                writeFailure(response, HttpServletResponse.SC_UNAUTHORIZED, ErrorCode.UNAUTHORIZED, objectMapper))
+                                writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED, "UNAUTHORIZED", "未认证", objectMapper))
                         .accessDeniedHandler((request, response, exception) ->
-                                writeFailure(response, HttpServletResponse.SC_FORBIDDEN, ErrorCode.FORBIDDEN, objectMapper))
+                                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN, "FORBIDDEN", "无访问权限", objectMapper))
                 )
                 .oauth2ResourceServer(resourceServer -> resourceServer.jwt(Customizer.withDefaults()))
                 .build();
@@ -80,15 +81,10 @@ public class SecurityConfig {
         return new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(rsaKey)));
     }
 
-    private void writeFailure(
-            HttpServletResponse response,
-            int status,
-            ErrorCode errorCode,
-            ObjectMapper objectMapper
-    ) throws IOException {
+    private void writeJsonError(HttpServletResponse response, int status, String code, String message, ObjectMapper objectMapper) throws IOException {
         response.setStatus(status);
         response.setCharacterEncoding("UTF-8");
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        objectMapper.writeValue(response.getWriter(), ApiResponse.failure(errorCode.getCode(), errorCode.name().toLowerCase()));
+        objectMapper.writeValue(response.getWriter(), Map.of("code", code, "message", message));
     }
 }

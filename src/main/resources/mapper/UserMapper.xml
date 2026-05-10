@@ -12,6 +12,7 @@
         <result column="nickname" property="nickname"/>
         <result column="avatar" property="avatar"/>
         <result column="bio" property="bio"/>
+        <result column="zg_id" property="zgId"/>
         <result column="tags_json" property="tagsJson"/>
         <result column="birthday" property="birthday"/>
         <result column="school" property="school"/>
@@ -50,6 +51,17 @@
         )
     </select>
 
+    <select id="existsByZgIdExceptId" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM users
+            WHERE zg_id = #{zgId}
+            <if test="excludeId != null">
+                AND id != #{excludeId}
+            </if>
+        )
+    </select>
+
     <insert id="insert" parameterType="com.mindshare.user.domain.User" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO users (
             phone,
@@ -58,6 +70,7 @@
             nickname,
             avatar,
             bio,
+            zg_id,
             tags_json,
             birthday,
             school,
@@ -71,6 +84,7 @@
             #{nickname},
             #{avatar},
             #{bio},
+            #{zgId},
             #{tagsJson},
             #{birthday},
             #{school},
@@ -87,6 +101,15 @@
         LIMIT 1
     </select>
 
+    <select id="listByIds" resultMap="UserResultMap">
+        SELECT *
+        FROM users
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
     <update id="updatePassword">
         UPDATE users
         SET password_hash = #{passwordHash},
@@ -100,6 +123,7 @@
             <if test="nickname != null">nickname = #{nickname},</if>
             <if test="avatar != null">avatar = #{avatar},</if>
             <if test="bio != null">bio = #{bio},</if>
+            <if test="zgId != null">zg_id = #{zgId},</if>
             <if test="tagsJson != null">tags_json = #{tagsJson},</if>
             <if test="birthday != null">birthday = #{birthday},</if>
             <if test="school != null">school = #{school},</if>

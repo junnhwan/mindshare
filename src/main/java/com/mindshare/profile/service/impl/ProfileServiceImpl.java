@@ -57,7 +57,7 @@ public class ProfileServiceImpl implements ProfileService {
     private User loadUser(long userId) {
         User user = userMapper.findById(userId);
         if (user == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "user not found");
+            throw new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "user not found");
         }
         return user;
     }

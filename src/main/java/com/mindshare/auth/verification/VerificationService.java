@@ -29,7 +29,7 @@ public class VerificationService {
 
     public SendCodeResult sendCode(VerificationScene scene, String identifier) {
         if (scene == null || !StringUtils.hasText(identifier)) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "please provide correct verification params");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, ErrorCode.BAD_REQUEST.getDefaultMessage());
         }
         AuthProperties.Verification verification = authProperties.getVerification();
         String code = generateNumericCode(verification.getCodeLength());
@@ -40,7 +40,7 @@ public class VerificationService {
 
     public VerificationCheckResult verify(VerificationScene scene, String identifier, String code) {
         if (scene == null || !StringUtils.hasText(identifier) || !StringUtils.hasText(code)) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "verification params are incomplete");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, ErrorCode.BAD_REQUEST.getDefaultMessage());
         }
         return codeStore.verify(scene.name(), identifier, code);
     }

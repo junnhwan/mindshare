@@ -4,6 +4,8 @@ import com.mindshare.user.domain.User;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 @Mapper
 public interface UserMapper {
 
@@ -15,9 +17,13 @@ public interface UserMapper {
 
     boolean existsByEmail(@Param("email") String email);
 
+    boolean existsByZgIdExceptId(@Param("zgId") String zgId, @Param("excludeId") Long excludeId);
+
     void insert(User user);
 
     User findById(@Param("id") Long id);
+
+    List<User> listByIds(@Param("ids") List<Long> ids);
 
     void updatePassword(@Param("id") Long id, @Param("passwordHash") String passwordHash);
 

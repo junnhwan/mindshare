@@ -72,10 +72,10 @@ public class AuthService {
         String identifier = normalizeIdentifier(request.identifierType(), request.identifier());
         boolean exists = identifierExists(request.identifierType(), identifier);
         if (request.scene() == VerificationScene.REGISTER && exists) {
-            throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, "identifier already exists");
+            throw new BusinessException(ErrorCode.IDENTIFIER_EXISTS, ErrorCode.IDENTIFIER_EXISTS.getDefaultMessage());
         }
         if ((request.scene() == VerificationScene.LOGIN || request.scene() == VerificationScene.RESET_PASSWORD) && !exists) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "identifier not found");
+            throw new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, ErrorCode.IDENTIFIER_NOT_FOUND.getDefaultMessage());
         }
 
         SendCodeResult result = verificationService.sendCode(request.scene(), identifier);
@@ -89,7 +89,7 @@ public class AuthService {
 
         String identifier = normalizeIdentifier(request.identifierType(), request.identifier());
         if (identifierExists(request.identifierType(), identifier)) {
-            throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, "identifier already exists");
+            throw new BusinessException(ErrorCode.IDENTIFIER_EXISTS, ErrorCode.IDENTIFIER_EXISTS.getDefaultMessage());
         }
 
         ensureVerificationSuccess(verificationService.verify(VerificationScene.REGISTER, identifier, request.code()));
@@ -117,20 +117,20 @@ public class AuthService {
         validateIdentifier(request.identifierType(), request.identifier());
         String identifier = normalizeIdentifier(request.identifierType(), request.identifier());
         User user = findUserByIdentifier(request.identifierType(), identifier)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "identifier not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, ErrorCode.IDENTIFIER_NOT_FOUND.getDefaultMessage()));
 
         String channel;
         if (StringUtils.hasText(request.password())) {
             channel = "PASSWORD";
             if (!StringUtils.hasText(user.getPasswordHash()) || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
                 recordLoginLog(user.getId(), identifier, channel, clientInfo, "FAILED");
-                throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "invalid credentials");
+                throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, ErrorCode.INVALID_CREDENTIALS.getDefaultMessage());
             }
         } else if (StringUtils.hasText(request.code())) {
             channel = "CODE";
             ensureVerificationSuccess(verificationService.verify(VerificationScene.LOGIN, identifier, request.code()));
         } else {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "password or code is required");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, ErrorCode.BAD_REQUEST.getDefaultMessage());
         }
 
         TokenPair tokenPair = jwtService.issueTokenPair(user);
@@ -143,17 +143,17 @@ public class AuthService {
     public TokenResponse refresh(TokenRefreshRequest request) {
         Jwt jwt = decodeRefreshToken(request.refreshToken());
         if (!Objects.equals("refresh", jwtService.extractTokenType(jwt))) {
-            throw new BusinessException(ErrorCode.INVALID_TOKEN, "invalid refresh token");
+            throw new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID, "invalid refresh token");
         }
 
         long userId = jwtService.extractUserId(jwt);
         String tokenId = jwtService.extractTokenId(jwt);
         if (!refreshTokenStore.isTokenValid(userId, tokenId)) {
-            throw new BusinessException(ErrorCode.INVALID_TOKEN, "invalid refresh token");
+            throw new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID, "invalid refresh token");
         }
 
         User user = userService.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "user not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "user not found"));
         TokenPair tokenPair = jwtService.issueTokenPair(user);
         refreshTokenStore.revokeToken(userId, tokenId);
         storeRefreshToken(userId, tokenPair);
@@ -182,7 +182,7 @@ public class AuthService {
 
         String identifier = normalizeIdentifier(request.identifierType(), request.identifier());
         User user = findUserByIdentifier(request.identifierType(), identifier)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "user not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "user not found"));
 
         ensureVerificationSuccess(verificationService.verify(VerificationScene.RESET_PASSWORD, identifier, request.code()));
 
@@ -194,7 +194,7 @@ public class AuthService {
     @Transactional(readOnly = true)
     public AuthUserResponse me(long userId) {
         User user = userService.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "user not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "user not found"));
         return mapUser(user);
     }
 
@@ -255,19 +255,19 @@ public class AuthService {
             return;
         }
         if (result.status() == VerificationCodeStatus.NOT_FOUND) {
-            throw new BusinessException(ErrorCode.VERIFICATION_CODE_EXPIRED, "verification code expired");
+            throw new BusinessException(ErrorCode.VERIFICATION_NOT_FOUND, "verification code expired");
         }
         if (result.status() == VerificationCodeStatus.TOO_MANY_ATTEMPTS) {
-            throw new BusinessException(ErrorCode.TOO_MANY_ATTEMPTS, "too many verification attempts");
+            throw new BusinessException(ErrorCode.VERIFICATION_TOO_MANY_ATTEMPTS, "too many verification attempts");
         }
-        throw new BusinessException(ErrorCode.VERIFICATION_CODE_INVALID, "verification code invalid");
+        throw new BusinessException(ErrorCode.VERIFICATION_MISMATCH, "verification code invalid");
     }
 
     private Jwt decodeRefreshToken(String refreshToken) {
         try {
             return jwtService.decode(refreshToken);
         } catch (JwtException exception) {
-            throw new BusinessException(ErrorCode.INVALID_TOKEN, "invalid refresh token");
+            throw new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID, "invalid refresh token");
         }
     }
 
@@ -297,7 +297,13 @@ public class AuthService {
                 user.getNickname(),
                 user.getAvatar(),
                 user.getPhone(),
-                user.getEmail()
+                user.getEmail(),
+                user.getZgId(),
+                user.getGender(),
+                user.getBirthday(),
+                user.getSchool(),
+                user.getBio(),
+                user.getTagsJson()
         );
     }
 

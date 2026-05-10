@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
     nickname VARCHAR(64) NOT NULL,
     avatar VARCHAR(512),
     bio VARCHAR(512),
+    zg_id VARCHAR(64),
     tags_json TEXT,
     birthday DATE,
     school VARCHAR(128),
@@ -22,6 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE UNIQUE INDEX IF NOT EXISTS uk_users_phone ON users(phone);
 CREATE UNIQUE INDEX IF NOT EXISTS uk_users_email ON users(email);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_users_zg_id ON users(zg_id);
 
 CREATE TABLE IF NOT EXISTS login_logs (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

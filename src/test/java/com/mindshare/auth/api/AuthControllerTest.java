@@ -123,8 +123,8 @@ class AuthControllerTest {
                                   "refreshToken": "not-a-token"
                                 }
                                 """))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("INVALID_TOKEN"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALID"));
     }
 
     @Test

@@ -3,37 +3,55 @@ package com.mindshare.common.web;
 import com.mindshare.common.exception.BusinessException;
 import com.mindshare.common.exception.ErrorCode;
 import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.HashMap;
+import java.util.Map;
+
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException exception) {
-        ErrorCode errorCode = exception.getErrorCode();
-        return ResponseEntity.status(errorCode.getHttpStatus())
-                .body(ApiResponse.failure(errorCode.getCode(), exception.getMessage()));
+    public ResponseEntity<Map<String, Object>> handleBusiness(BusinessException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("code", ex.getErrorCode().getCode());
+        body.put("message", ex.getMessage());
+        return ResponseEntity.badRequest().body(body);
     }
 
-    @ExceptionHandler({
-            MethodArgumentNotValidException.class,
-            BindException.class,
-            ConstraintViolationException.class,
-            IllegalArgumentException.class
-    })
-    public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception exception) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.failure(ErrorCode.BAD_REQUEST.getCode(), exception.getMessage()));
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(FieldError::getDefaultMessage)
+                .orElse(ErrorCode.BAD_REQUEST.getDefaultMessage());
+        Map<String, Object> body = new HashMap<>();
+        body.put("code", ErrorCode.BAD_REQUEST.getCode());
+        body.put("message", message);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleConstraintViolation(ConstraintViolationException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("code", ErrorCode.BAD_REQUEST.getCode());
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleUnexpectedException(Exception exception) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.failure(ErrorCode.INTERNAL_ERROR.getCode(), exception.getMessage()));
+    public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
+        log.error("Unhandled exception", ex);
+        Map<String, Object> body = new HashMap<>();
+        body.put("code", ErrorCode.INTERNAL_ERROR.getCode());
+        body.put("message", "服务异常，请稍后重试");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 }
