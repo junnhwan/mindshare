@@ -1,6 +1,6 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Heart, Bookmark } from "lucide-react";
-import { like, unlike, fav, unfav } from "../../api/counter";
+import { like, unlike, fav, unfav, getCounter } from "../../api/counter";
 import { formatCount } from "../../lib/format";
 import { useAuth } from "../../auth/AuthProvider";
 import toast from "react-hot-toast";
@@ -28,6 +28,16 @@ export function PostActions({
   const iconSize = size === "sm" ? 16 : 18;
   const textSize = size === "sm" ? "text-xs" : "text-sm";
 
+  // Reactive counter query
+  const { data: countsData } = useQuery({
+    queryKey: ["counts", "knowpost", postId],
+    queryFn: () => getCounter("knowpost", postId, "like,fav"),
+    staleTime: 30_000,
+  });
+
+  const effectiveLikeCount = countsData?.like ?? likeCount;
+  const effectiveFavCount = countsData?.fav ?? favCount;
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["counts", "knowpost", postId] });
     queryClient.invalidateQueries({ queryKey: ["feed"] });
@@ -35,7 +45,9 @@ export function PostActions({
 
   const likeMutation = useMutation({
     mutationFn: () =>
-      liked ? unlike({ entityType: "knowpost", entityId: String(postId) }) : like({ entityType: "knowpost", entityId: String(postId) }),
+      liked
+        ? unlike({ entityType: "knowpost", entityId: String(postId) })
+        : like({ entityType: "knowpost", entityId: String(postId) }),
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["counts", "knowpost", postId] });
       const prev = queryClient.getQueryData<{ like: number; fav: number }>(["counts", "knowpost", postId]);
@@ -58,7 +70,9 @@ export function PostActions({
 
   const favMutation = useMutation({
     mutationFn: () =>
-      faved ? unfav({ entityType: "knowpost", entityId: String(postId) }) : fav({ entityType: "knowpost", entityId: String(postId) }),
+      faved
+        ? unfav({ entityType: "knowpost", entityId: String(postId) })
+        : fav({ entityType: "knowpost", entityId: String(postId) }),
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["counts", "knowpost", postId] });
       const prev = queryClient.getQueryData<{ like: number; fav: number }>(["counts", "knowpost", postId]);
@@ -87,18 +101,8 @@ export function PostActions({
     mutation.mutate();
   };
 
-  // Calculate effective state (query data overrides props if available)
-  const countsData = queryClient.getQueryData<{ like: number; fav: number }>(["counts", "knowpost", postId]);
-  const effectiveLikeCount = countsData?.like ?? likeCount;
-  const effectiveFavCount = countsData?.fav ?? favCount;
-
-  // Determine visual state based on mutation + query data
-  const isLiked = likeMutation.isPending
-    ? !liked
-    : liked;
-  const isFaved = favMutation.isPending
-    ? !faved
-    : faved;
+  const isLiked = likeMutation.isPending ? !liked : liked;
+  const isFaved = favMutation.isPending ? !faved : faved;
 
   return (
     <div className={`flex items-center gap-4 ${textSize}`}>
@@ -106,9 +110,7 @@ export function PostActions({
         onClick={() => handleClick(likeMutation)}
         disabled={likeMutation.isPending}
         className={`flex items-center gap-1.5 transition-colors ${
-          isLiked
-            ? "text-error"
-            : "text-text-tertiary hover:text-error"
+          isLiked ? "text-error" : "text-text-tertiary hover:text-error"
         }`}
       >
         <Heart
@@ -125,9 +127,7 @@ export function PostActions({
         onClick={() => handleClick(favMutation)}
         disabled={favMutation.isPending}
         className={`flex items-center gap-1.5 transition-colors ${
-          isFaved
-            ? "text-amber-400"
-            : "text-text-tertiary hover:text-amber-400"
+          isFaved ? "text-amber-400" : "text-text-tertiary hover:text-amber-400"
         }`}
       >
         <Bookmark

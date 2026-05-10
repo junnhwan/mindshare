@@ -246,6 +246,74 @@ tbody tr:hover td { background: rgba(56,189,248,0.03); }
 /* Fade-in animation */
 .fade-in { animation: fadeIn 0.6s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+/* Dark mode overrides */
+body.dark .mesh-gradient { opacity: 0.3; }
+body.dark .code-block { background: #020617; }
+body.dark .diagram { background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.06); }
+body.dark .key-grid { border-color: rgba(255,255,255,0.06); }
+body.dark .key-grid .kh { background: rgba(255,255,255,0.04); }
+body.dark .key-grid .kr { border-top-color: rgba(255,255,255,0.04); }
+body.dark tbody td { border-bottom-color: rgba(255,255,255,0.04); }
+body.dark tbody tr:hover td { background: rgba(56,189,248,0.05); }
+body.dark thead th { background: rgba(255,255,255,0.03); border-bottom-color: rgba(255,255,255,0.08); }
+body.dark .callout { background: rgba(56,189,248,0.08); }
+body.dark .callout.warn { background: rgba(245,158,11,0.08); }
+body.dark .callout.danger { background: rgba(239,68,68,0.06); }
+body.dark .callout.good { background: rgba(16,185,129,0.06); }
+
+/* Dark mode toggle */
+.dm-toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 100;
+  width: 40px; height: 40px; border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border); background: var(--glass-bg);
+  backdrop-filter: blur(8px); cursor: pointer; display: flex;
+  align-items: center; justify-content: center; font-size: 1.1rem;
+  transition: all 0.2s;
+}
+.dm-toggle:hover { border-color: var(--brand-azure); }
+
+/* Quiz button */
+.quiz-fab {
+  position: fixed; bottom: 2rem; right: 2rem; z-index: 101;
+  width: 56px; height: 56px; border-radius: 50%; border: none;
+  background: var(--brand-azure); color: #fff; cursor: pointer;
+  box-shadow: 0 4px 20px rgba(56,189,248,0.4);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; transition: all 0.3s;
+}
+.quiz-fab:hover { transform: scale(1.1); box-shadow: 0 6px 30px rgba(56,189,248,0.5); }
+
+/* Quiz modal */
+.quiz-overlay {
+  position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center;
+}
+.quiz-overlay.open { display: flex; }
+.quiz-card {
+  background: var(--glass-bg); backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-xl);
+  padding: 2.5rem; max-width: 560px; width: 90%;
+  box-shadow: var(--shadow-xl); text-align: center;
+}
+.quiz-card h3 { font-size: 1.3rem; font-weight: 800; margin-bottom: 1.5rem; line-height: 1.5; }
+.quiz-card .q-meta { display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 1rem; }
+.quiz-card .q-hint {
+  display: none; margin-top: 1.5rem; padding: 1rem;
+  background: rgba(56,189,248,0.06); border-radius: var(--radius-md);
+  font-size: 0.82rem; color: var(--text-dim); text-align: left; line-height: 1.7;
+}
+.quiz-actions { display: flex; gap: 0.8rem; justify-content: center; margin-top: 1.5rem; flex-wrap: wrap; }
+
+/* Print styles */
+@media print {
+  .sidebar, .menu-toggle, .dm-toggle, .quiz-fab, .quiz-overlay, .noise-overlay { display: none !important; }
+  .main { max-width: 100%; padding: 0; }
+  body { font-size: 11pt; background: #fff; color: #000; }
+  .glass-card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; margin-bottom: 0.5rem; }
+  details.glass-card[open] { page-break-inside: avoid; }
+  .code-block { background: #f5f5f5; color: #333; border: 1px solid #ddd; font-size: 8pt; }
+  .diagram { font-size: 7pt; border: 1px solid #ddd; }
+}
 </style>
 </head>
 <body>
@@ -286,6 +354,8 @@ tbody tr:hover td { background: rgba(56,189,248,0.03); }
     <li><a href="#t3-2">　设计深挖</a></li>
     <li><a href="#t3-3">　HotKeyDetector</a></li>
     <li><a href="#t3-4">　三种缓存问题</a></li>
+    <li><a href="#code" class="topic-main">关键代码注释</a></li>
+    <li><a href="#trace" class="topic-main">全链路串联</a></li>
     <li><a href="#interview" class="topic-main" style="color:var(--brand-azure)">面试拷打 50 题 ↓</a></li>
   </ul>
 </aside>
@@ -788,7 +858,432 @@ GET /api/v1/knowpost/feed?page=1&size=20  (uid=99)
   </details>
 </div>
 
-<!-- ==================== INTERVIEW QUESTIONS ==================== -->
+  <div class="section-subtitle">全链路串联</div>
+  <h2 class="section-hero" style="font-size:1.8rem">一次"刷 Feed → 点赞 → 关注"的完整旅程</h2>
+  <p style="color:var(--text-dim);margin-bottom:1rem">三个系统不是孤立的。让用户 Alice 走一遍完整流程，看看各层如何协作。</p>
+
+  <details class="glass-card" open>
+    <summary>场景设定</summary>
+    <div class="callout">
+      <strong>角色：</strong>Alice（userId=42）刚打开 App，刷到 Bob（userId=99）的帖子（postId=888）。<br>
+      <strong>目标：</strong>Alice 浏览 Feed → 给帖子 888 点赞 → 关注 Bob → 看到粉丝数 +1。<br>
+      <strong>时间线：</strong>这个过程跨越了 3 个系统、Redis 的 15+ 个 key、MySQL 的 3 张表、Kafka 的 2 个 topic。
+    </div>
+  </details>
+
+  <details class="glass-card">
+    <summary>阶段一：刷 Feed — Alice 看到帖子 888</summary>
+    <div class="diagram" style="font-size:0.73rem;line-height:1.5">
+Alice 打开 App → GET /api/v1/knowpost/feed?page=1&size=20
+  │
+  ├─ <span style="color:#f59e0b">[Feed 流]</span> Caffeine L0 miss → Redis L1 assembleFromCache
+  │   LRANGE feed:public:ids:20:{hourSlot}:1 → ["888","777",...]
+  │   MGET feed:item:888 feed:item:777 ... → 20条JSON
+  │
+  ├─ <span style="color:#38bdf8">[计数系统]</span> 对每个帖子调用 counterService.getCounts() + isLiked()
+  │   GET cnt:v1:knowpost:888 → byte[4..7]=42 (likeCount)
+  │   GETBIT bm:like:knowpost:888:0 42 → 0 (Alice还没点赞)
+  │   GET cnt:v1:knowpost:777 → byte[4..7]=15
+  │   GETBIT bm:like:knowpost:777:0 42 → 1 (Alice已经点过了)
+  │   <span class="cm">← 20个帖子=20次GET+20次GETBIT，全部毫秒级</span>
+  │
+  └─ enrich() 叠加 liked/faved → 返回给Alice
+      Alice 看到帖子888：点赞数42，自己还没点赞（❤️空心）</div>
+    <div class="callout">
+      <strong>关键：</strong>Feed 缓存只存标题/描述/图片。计数通过 counterService 实时查 SDS，点赞状态通过 GETBIT 实时查位图。缓存和状态分离——不同用户看到不同的 liked/faved，但共享同一份帖子元数据。
+    </div>
+  </details>
+
+  <details class="glass-card">
+    <summary>阶段二：点赞 — Alice 给帖子 888 点赞</summary>
+    <div class="diagram" style="font-size:0.73rem;line-height:1.5">
+Alice 点击 ❤️ → POST /api/v1/action/like {"entityType":"knowpost","entityId":"888"}
+  │
+  ├─ <span style="color:#38bdf8">[计数系统]</span> CounterServiceImpl.toggle()
+  │   chunk=42/32768=0, bit=42%32768=42
+  │   EVAL TOGGLE_LUA bm:like:knowpost:888:0 42 "add"
+  │   GETBIT → 0 (之前没点过) → SETBIT 1 → return 1 (changed!)
+  │
+  ├─ <span style="color:#38bdf8">[计数]</span> changed=1 → 两条消息同时发出：
+  │   ① <span style="color:#f59e0b">Kafka</span> → CounterEvent(knowpost,888,like,idx=1,uid=42,delta=+1)
+  │   ② <span style="color:#10b981">Spring Event</span> → FeedCacheInvalidationListener 即时更新Feed缓存
+  │
+  ├─ <span style="color:#f59e0b">[Feed流]</span> FeedCacheInvalidationListener.onCounterChanged()
+  │   ① 加载 knowpost 888 的 creatorId → 发现作者是Bob(99)
+  │   ② userCounterService.incrementLikesReceived(99, +1) → ucnt:99 likes+1
+  │   ③ SMEMBERS feed:public:index:888:{hourSlot} → 找到所有包含888的页面key
+  │   ④ 对每个页面: 更新Caffeine本地缓存(保留liked) + 更新Redis页面JSON(清除liked, 保留原TTL)
+  │   <span class="cm">← Alice立刻看到自己的 ❤️ 变红，赞数变 43</span>
+  │
+  ├─ <span style="color:#f59e0b">[Kafka异步]</span> CounterAggregationConsumer.onMessage()
+  │   HINCRBY agg:v1:knowpost:888 "1" 1 → 聚合桶 +1 → ack
+  │
+  └─ <span style="color:#f59e0b">[1秒后]</span> flush() 定时任务
+      INCR_FIELD_LUA: cnt:v1:knowpost:888 的 byte[4..7] 从42→43
+      DECR_FIELD_LUA: agg:v1:knowpost:888 field"1" -1 → 扣减到0 → HDEL</div>
+    <div class="callout">
+      <strong>两条路径的时序：</strong>Spring Event 路径 → 毫秒级（同步），Alice 点赞后立刻看到变化。<br>
+      Kafka 路径 → 最长 1 秒延迟（异步），SDS 在 1 秒内更新。这个窗口内如果另一个用户刷 Feed 看到计数还是 42，但 Alice 自己看到的是 43（因为她的 liked 状态来自 BITMAP，计数来自 Spring Event 即时更新）。
+    </div>
+  </details>
+
+  <details class="glass-card">
+    <summary>阶段三：关注 — Alice 关注 Bob</summary>
+    <div class="diagram" style="font-size:0.73rem;line-height:1.5">
+Alice 点击关注 → POST /api/v1/relation/follow?toUserId=99
+  │
+  ├─ <span style="color:#f59e0b">[用户关系]</span> RelationServiceImpl.follow(42, 99)
+  │   ① TOKEN_BUCKET_LUA rl:follow:42 → 有令牌 → 通过
+  │   ② <span style="color:#10b981">@Transactional 开始</span>
+  │   ③ INSERT INTO following (id=random, from=42, to=99, status=1)
+  │   ④ INSERT INTO outbox (id=random, type="FollowCreated", payload={from:42,to:99,id:...})
+  │   ⑤ <span style="color:#10b981">事务提交</span> → MySQL binlog 写入两条 INSERT
+  │
+  ├─ <span style="color:#38bdf8">[Canal桥接]</span> CanalKafkaBridge
+  │   getWithoutAck → binlog里看到outbox的INSERT → 提取payload
+  │   → kafka.send("canal-outbox", {table:"outbox",data:[{payload:"{...}"}]})
+  │   → ack(batchId)
+  │
+  ├─ <span style="color:#38bdf8">[Kafka消费]</span> CanalOutboxConsumer → RelationEventProcessor
+  │   ① SETNX dedup:rel:FollowCreated:42:99:{id} = "1", TTL=10min
+  │   ② INSERT INTO follower (id, to=99, from=42, status=1) ← 投影表异步更新
+  │   ③ ZADD uf:flws:42 {now} 99  + EXPIRE 2h  ← Alice的关注列表缓存
+  │   ④ ZADD uf:fans:99 {now} 42  + EXPIRE 2h  ← Bob的粉丝列表缓存
+  │
+  ├─ <span style="color:#38bdf8">[计数联动]</span> UserCounterService
+  │   ⑤ INCR_FIELD_LUA ucnt:42 → followings +1 (Alice关注数+1)
+  │   ⑥ INCR_FIELD_LUA ucnt:99 → followers  +1 (Bob粉丝数+1)
+  │
+  └─ <span style="color:#f59e0b">[自愈]</span> 最多300秒后，/counter 端点采样校验
+      SELECT COUNT(*) WHERE from=42 AND status=1 → 对比 ucnt:42 followings字段
+      不一致 → rebuildAllCounters(42)</div>
+    <div class="callout good">
+      <strong>延迟分析：</strong>Alice 点击关注 → 事务提交（~5ms）→ Canal 拉取 binlog（~100ms）→ Kafka 投递（~50ms）→ 消费者处理（~10ms）→ follower 表 + ZSet + 计数器全部更新。端到端 <strong>200ms 以内</strong>，对用户体验无感知。
+    </div>
+  </details>
+
+  <details class="glass-card">
+    <summary>完整数据流总览（时序图）</summary>
+    <div class="diagram" style="font-size:0.7rem;line-height:1.4">
+时间 ─────────────────────────────────────────────────────────────→
+     0ms        5ms        100ms      150ms      200ms      1s        300s
+
+Alice 刷Feed
+  ├─[Feed]──→ Caffeine→Redis→MySQL
+  ├─[计数]──→ GET SDS + GETBIT ×20
+  └─ 看到帖子888, 赞数42, ❤️空心
+
+Alice 点赞
+  ├─[计数]──→ Lua原子翻转 → changed=1
+  │               ├─ Spring Event → [Feed] 即时更新缓存 ← Alice看到❤️变红
+  │               └─ Kafka → [agg桶] HINCRBY → [1s后flush] SDS 42→43
+  └─[计数]──→ userCounter: Bob的likesReceived+1
+
+Alice 关注Bob
+  ├─[关系]──→ 令牌桶限流 → @Transactional
+  │               ├─ INSERT following
+  │               └─ INSERT outbox ────────────→ [binlog]
+  ├─[Canal]──→ getWithoutAck → 过滤outbox → kafka.send → ack
+  ├─[Kafka]──→ SETNX去重 → INSERT follower → ZADD缓存 → ucnt计数+1
+  └─[自愈]────────────────────────────────────────────────→ 300s校验
+
+<span style="color:var(--text-ghost)">每一条竖线代表一个系统边界。实线=同步，虚线=异步。三个系统通过 Kafka、Spring Event、MySQL binlog 三个通道相互协作。</span></div>
+  </details>
+
+  <details class="glass-card">
+    <summary>三个系统通过什么沟通？</summary>
+    <table>
+      <thead><tr><th>通道</th><th>从→到</th><th>延迟</th><th>可靠性</th><th>触发场景</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Kafka</strong></td><td>计数 → 聚合桶</td><td>&lt;1s</td><td>at-least-once</td><td>每次点赞/收藏</td></tr>
+        <tr><td><strong>Spring Event</strong></td><td>计数 → Feed 缓存</td><td>&lt;1ms</td><td>进程内同步</td><td>每次点赞/收藏（即时UI反馈）</td></tr>
+        <tr><td><strong>MySQL binlog + Canal + Kafka</strong></td><td>关系 → 投影表/缓存</td><td>&lt;200ms</td><td>at-least-once（binlog保证不丢）</td><td>每次关注/取关</td></tr>
+        <tr><td><strong>Redis SETNX</strong></td><td>Kafka → 关系处理器</td><td>—</td><td>10min幂等窗口</td><td>防止重复消费</td></tr>
+        <tr><td><strong>反向索引（Redis Set）</strong></td><td>Feed 缓存 → 页面失效</td><td>即时</td><td>按小时槽覆盖</td><td>点赞导致计数变化时精准更新</td></tr>
+        <tr><td><strong>300s 采样校验</strong></td><td>MySQL → 用户计数器</td><td>&lt;300s</td><td>自动修复</td><td>自愈机制</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <details class="glass-card">
+    <summary>面试话术：怎么用这个故事回答"介绍你的项目"</summary>
+    <div class="callout good">
+      <strong>3分钟版本结构：</strong><br>
+      ① 一句话概览（15s）：我用一个社交内容平台的项目，做了三件事——计数、关系、Feed 缓存。它们通过 Kafka 和 binlog 串在一起。<br>
+      ② 讲最难的（1min）：计数系统——两层模型（Bitmap+SDS），写路径走 Lua→Kafka→聚合桶→SDS，读路径 SDS 一次 GET。重建用三层保护。<br>
+      ③ 讲最不一样的（1min）：关系系统不用分布式事务，用 Outbox+Canal 保证事件不丢。和计数系统的区别：为什么一个用 Canal 一个不用。<br>
+      ④ 收尾（45s）：Feed 多级缓存——片段缓存+小时槽+反向索引+hotkey。三个系统通过一次"刷Feed→点赞→关注"串起来。
+    </div>
+  </details>
+</div>
+
+<!-- ==================== CODE DEEP-DIVE ==================== -->
+<div class="fade-in" id="code" style="margin-top:2.5rem">
+  <div class="section-subtitle">代码深潜</div>
+  <h2 class="section-hero" style="font-size:1.8rem">关键代码 — 逐行注释版</h2>
+  <p style="color:var(--text-dim);margin-bottom:1rem">面试官问"能写出来吗"的时候，这些片段就是你的武器。</p>
+
+  <details class="glass-card" open>
+    <summary>1. TOGGLE_LUA — 原子点赞翻转（Redis Lua）</summary>
+    <div class="code-block">
+<span class="cm">-- KEYS[1] = bm:like:knowpost:123:0  (位图key)
+-- ARGV[1] = 42                        (bit偏移)
+-- ARGV[2] = "add" 或 "remove"         (操作类型)</span>
+
+<span class="kw">local</span> bmKey = <span class="fn">KEYS</span>[1]
+<span class="kw">local</span> offset = <span class="fn">tonumber</span>(<span class="fn">ARGV</span>[1])
+<span class="kw">local</span> op = <span class="fn">ARGV</span>[2]
+
+<span class="cm">-- ① 先读当前位状态（关键！不能跳过这一步）</span>
+<span class="kw">local</span> prev = redis.call(<span class="str">'GETBIT'</span>, bmKey, offset)
+
+<span class="kw">if</span> op == <span class="str">'add'</span> <span class="kw">then</span>
+  <span class="cm">-- ② 如果已经是1 → 幂等返回0（不重复产生计数事件）</span>
+  <span class="kw">if</span> prev == 1 <span class="kw">then return</span> 0 <span class="kw">end</span>
+  <span class="cm">-- ③ 确实是0→1的转换 → 翻转并返回changed</span>
+  redis.call(<span class="str">'SETBIT'</span>, bmKey, offset, 1)
+  <span class="kw">return</span> 1
+
+<span class="kw">elseif</span> op == <span class="str">'remove'</span> <span class="kw">then</span>
+  <span class="cm">-- ②' 同样：如果已经是0 → 幂等返回0</span>
+  <span class="kw">if</span> prev == 0 <span class="kw">then return</span> 0 <span class="kw">end</span>
+  <span class="cm">-- ③' 1→0的转换 → 翻转并返回changed</span>
+  redis.call(<span class="str">'SETBIT'</span>, bmKey, offset, 0)
+  <span class="kw">return</span> 1
+<span class="kw">end</span>
+
+<span class="kw">return</span> -1  <span class="cm">-- 非法操作类型（不会发生）</span></div>
+    <div class="callout">
+      <strong>为什么不能直接 SETBIT？</strong> SETBIT 返回旧值，但两个并发 SETBIT 都返回不同的旧值（A返回0，B返回1），调用方都认为状态改变了。Lua 里先 GETBIT 判断再 SETBIT，<strong>在 Redis 单线程内原子完成</strong>，中间没有其他命令插入。
+    </div>
+  </details>
+
+  <details class="glass-card">
+    <summary>2. INCR_FIELD_LUA — 原子字段增量（Redis Lua）</summary>
+    <div class="code-block">
+<span class="cm">-- KEYS[1] = cnt:v1:knowpost:123  (SDS key)
+-- ARGV[1] = 5                     (schema长度/字段数)
+-- ARGV[2] = 4                     (每字段字节数)
+-- ARGV[3] = 1                     (字段索引, 0-based for "like")
+-- ARGV[4] = 1                     (delta: +1 或 -1)</span>
+
+<span class="cm">-- 大端int32读取：从byte[off+1..off+4]拼接成整数</span>
+<span class="kw">local function</span> read32be(s, off)
+  <span class="kw">local</span> b = {string.byte(s, off+1, off+4)}   <span class="cm">-- Lua的string从1开始!</span>
+  <span class="kw">local</span> n = 0
+  <span class="kw">for</span> i=1,4 <span class="kw">do</span> n = n * 256 + b[i] <span class="kw">end</span>        <span class="cm">-- 大端：高位在前</span>
+  <span class="kw">return</span> n
+<span class="kw">end</span>
+
+<span class="cm">-- 大端int32写入：整数拆成4个字节</span>
+<span class="kw">local function</span> write32be(n)
+  <span class="kw">local</span> t = {}
+  <span class="kw">for</span> i=4,1,-1 <span class="kw">do</span> t[i] = n % 256; n = math.floor(n/256) <span class="kw">end</span>
+  <span class="kw">return</span> string.char(unpack(t))        <span class="cm">-- 从高位到低位拼成字符串</span>
+<span class="kw">end</span>
+
+<span class="kw">local</span> cntKey = <span class="fn">KEYS</span>[1]
+<span class="kw">local</span> schemaLen = <span class="fn">tonumber</span>(<span class="fn">ARGV</span>[1])
+<span class="kw">local</span> fieldSize = <span class="fn">tonumber</span>(<span class="fn">ARGV</span>[2])
+<span class="kw">local</span> idx = <span class="fn">tonumber</span>(<span class="fn">ARGV</span>[3])
+<span class="kw">local</span> delta = <span class="fn">tonumber</span>(<span class="fn">ARGV</span>[4])
+
+<span class="kw">local</span> cnt = redis.call(<span class="str">'GET'</span>, cntKey)
+<span class="cm">-- ① SDS不存在 → 全零初始化（关键：保证系统冷启动可用）</span>
+<span class="kw">if not</span> cnt <span class="kw">then</span>
+  cnt = string.rep(string.char(0), schemaLen * fieldSize)
+<span class="kw">end</span>
+
+<span class="kw">local</span> off = idx * fieldSize
+<span class="kw">local</span> v = read32be(cnt, off) + delta
+<span class="cm">-- ② 不能为负（防止取消点赞把计数拉到负值）</span>
+<span class="kw">if</span> v &lt; 0 <span class="kw">then</span> v = 0 <span class="kw">end</span>
+
+<span class="kw">local</span> seg = write32be(v)
+<span class="cm">-- ③ 替换目标字段的4字节，其他字段不变（就地编辑）</span>
+cnt = string.sub(cnt, 1, off) .. seg .. string.sub(cnt, off+fieldSize+1)
+
+redis.call(<span class="str">'SET'</span>, cntKey, cnt)
+<span class="kw">return</span> 1</div>
+    <div class="callout">
+      <strong>全部在 Redis 内原子执行。</strong> GET→解码→+delta→编码→SET 之间不会有其他命令。但注意两个 Lua 脚本之间的原子性不保证——flush() 和 rebuild() 同时操作同一个 SDS key 时，各脚本独立原子，执行顺序取决于 Redis 事件循环。
+    </div>
+  </details>
+
+  <details class="glass-card">
+    <summary>3. Single-Flight 模式 — 防缓存击穿（Java）</summary>
+    <div class="code-block">
+<span class="cm">// KnowPostFeedServiceImpl.java — getPublicFeed()</span>
+<span class="cm">// ConcurrentHashMap: key=idsKey(Redis级别), value=锁对象</span>
+<span class="kw">private final</span> ConcurrentHashMap&lt;String, Object&gt; singleFlight = <span class="kw">new</span> ConcurrentHashMap&lt;&gt;();
+
+<span class="cm">// ① computeIfAbsent: 原子地"有则返回，无则创建"</span>
+<span class="cm">//    如果 idsKey 已有锁对象 → 返回该锁 → 和其他线程共享同一把锁</span>
+<span class="cm">//    如果 idsKey 没有锁   → 创建 new Object() → 只有这个线程拿到自己创建的锁</span>
+Object lock = singleFlight.computeIfAbsent(idsKey, k -&gt; <span class="kw">new</span> Object());
+
+<span class="kw">synchronized</span> (lock) {
+    <span class="cm">// ② Double Check: 在等锁期间，前一个线程可能已经回填了缓存</span>
+    <span class="cm">//    避免重复回源数据库</span>
+    FeedPageResponse again = assembleFromCache(idsKey, ...);
+    <span class="kw">if</span> (again != <span class="kw">null</span>) {
+        feedPublicCache.put(localPageKey, again);
+        singleFlight.remove(idsKey);  <span class="cm">// ← 释放锁对象，防止内存泄漏</span>
+        <span class="kw">return</span> again;
+    }
+
+    <span class="cm">// ③ 数据库回源（只有持锁线程执行）</span>
+    List&lt;KnowPostFeedRow&gt; rows = mapper.listFeedPublic(size + 1, offset);
+
+    <span class="cm">// ④ 回填缓存（其他等锁线程受益）</span>
+    writeCaches(...);
+    feedPublicCache.put(localPageKey, respForCache);
+    singleFlight.remove(idsKey);  <span class="cm">// ← 必须释放！否则所有后续请求永远等锁</span>
+
+    <span class="kw">return</span> enrich(respForCache, currentUserId);
+}
+<span class="cm">// ⚠ 风险：如果第③步抛异常，remove() 不执行 → 锁泄漏 → 死锁
+// 生产应改为 try { ... } finally { singleFlight.remove(idsKey); }</span></div>
+    <div class="callout warn">
+      <strong>为什么用 idsKey 而不是 localPageKey？</strong> idsKey 是 Redis 层面的全局标识（跨应用实例），localPageKey 是应用本地的概念（含版本号）。用 idsKey 保证不同应用实例对同一页的请求共享同一把锁。
+    </div>
+  </details>
+
+  <details class="glass-card">
+    <summary>4. TOKEN_BUCKET_LUA — 令牌桶限流（Redis Lua）</summary>
+    <div class="code-block">
+<span class="cm">-- KEYS[1] = rl:follow:42  (限流key，用Redis Hash存储)
+-- ARGV[1] = 100            (capacity，桶容量)
+-- ARGV[2] = 1              (rate，每秒生成令牌数)</span>
+
+<span class="kw">local</span> key = <span class="fn">KEYS</span>[1]
+<span class="kw">local</span> capacity = <span class="fn">tonumber</span>(<span class="fn">ARGV</span>[1])
+<span class="kw">local</span> rate = <span class="fn">tonumber</span>(<span class="fn">ARGV</span>[2])
+
+<span class="cm">-- ① 用 TIME 命令获取单调秒数（比服务器时钟可靠）</span>
+<span class="kw">local</span> now = redis.call(<span class="str">'TIME'</span>)[1]
+
+<span class="kw">local</span> last = redis.call(<span class="str">'HGET'</span>, key, <span class="str">'last'</span>)
+<span class="kw">local</span> tokens = redis.call(<span class="str">'HGET'</span>, key, <span class="str">'tokens'</span>)
+
+<span class="cm">-- ② 首次请求：初始化满桶</span>
+<span class="kw">if not</span> last <span class="kw">then</span> last = now; tokens = capacity <span class="kw">end</span>
+
+<span class="cm">-- ③ 计算流逝时间内补充的令牌数（匀速补充）</span>
+<span class="kw">local</span> elapsed = <span class="fn">tonumber</span>(now) - <span class="fn">tonumber</span>(last)
+<span class="kw">local</span> add = elapsed * rate
+tokens = <span class="fn">math.min</span>(capacity, <span class="fn">tonumber</span>(tokens) + add)
+
+<span class="cm">-- ④ 令牌不够 → 拒绝 + 更新状态（保留当前令牌数）</span>
+<span class="kw">if</span> tokens &lt; 1 <span class="kw">then</span>
+  redis.call(<span class="str">'HSET'</span>, key, <span class="str">'last'</span>, now)
+  redis.call(<span class="str">'HSET'</span>, key, <span class="str">'tokens'</span>, tokens)
+  <span class="kw">return</span> 0
+<span class="kw">end</span>
+
+<span class="cm">-- ⑤ 消耗1个令牌 → 更新桶状态 → 设置60s过期（idle清理）</span>
+tokens = tokens - 1
+redis.call(<span class="str">'HSET'</span>, key, <span class="str">'last'</span>, now)
+redis.call(<span class="str">'HSET'</span>, key, <span class="str">'tokens'</span>, tokens)
+redis.call(<span class="str">'PEXPIRE'</span>, key, 60000)
+<span class="kw">return</span> 1</div>
+    <div class="callout">
+      <strong>100 capacity + 1/s rate 的含义：</strong> 用户可以 1 秒内 burst 关注 100 人（导入书签等），之后需要等 1 秒才能再关注。速率 1/s 是正常限流（每秒只能关注 1 人），容量 100 是 burst 容忍。
+    </div>
+  </details>
+
+  <details class="glass-card">
+    <summary>5. writeCaches — 写入三级缓存（Java）</summary>
+    <div class="code-block">
+<span class="cm">// KnowPostFeedServiceImpl.java</span>
+<span class="kw">private void</span> writeCaches(String pageKey, String idsKey, String hasMoreKey,
+                          <span class="kw">int</span> size, List&lt;KnowPostFeedRow&gt; rows,
+                          List&lt;FeedItemResponse&gt; items, <span class="kw">boolean</span> hasMore,
+                          Duration frTtl) {
+
+    <span class="cm">// ① 提取所有帖子ID → LPUSH 到 Redis List → 设TTL</span>
+    List&lt;String&gt; idVals = <span class="kw">new</span> ArrayList&lt;&gt;();
+    <span class="kw">for</span> (KnowPostFeedRow r : rows) idVals.add(String.valueOf(r.getId()));
+    redis.opsForList().leftPushAll(idsKey, idVals);
+    redis.expire(idsKey, frTtl);  <span class="cm">// 60-90s (含随机抖动)</span>
+
+    <span class="cm">// ② hasMore 软缓存（短TTL，高浮动）</span>
+    <span class="kw">if</span> (idVals.size() == size &amp;&amp; hasMore) {
+        redis.opsForValue().set(hasMoreKey, <span class="str">"1"</span>,
+            Duration.ofSeconds(10 + ThreadLocalRandom.current().nextInt(11)));
+    }
+
+    <span class="cm">// ③ 页面键集合索引（用于批量失效与清理）</span>
+    redis.opsForSet().add(<span class="str">"feed:public:pages"</span>, pageKey);
+
+    <span class="kw">for</span> (FeedItemResponse it : items) {
+        <span class="cm">// ④ 反向索引：按小时槽记录"这个帖子出现在哪些页面上"</span>
+        <span class="kw">long</span> hourSlot = System.currentTimeMillis() / 3600000L;
+        String idxKey = <span class="str">"feed:public:index:"</span> + it.id() + <span class="str">":"</span> + hourSlot;
+        redis.opsForSet().add(idxKey, pageKey);
+        redis.expire(idxKey, frTtl);
+
+        <span class="cm">// ⑤ 条目缓存：每个帖子单独一个key，存完整JSON（无liked/faved）</span>
+        String itemKey = <span class="str">"feed:item:"</span> + it.id();
+        String itemJson = objectMapper.writeValueAsString(it);
+        redis.opsForValue().set(itemKey, itemJson, frTtl);
+    }
+}</div>
+    <div class="callout">
+      <strong>为什么每个 item 单独一个 key？</strong> 当帖子被点赞时，反向索引定位到受影响的页面，可以精准更新单个 item key 中的计数。如果整页存一个 JSON，就得把整页读出来→改一个数字→写回去——修改成本高且耗时。
+    </div>
+  </details>
+
+  <details class="glass-card">
+    <summary>6. RelationEventProcessor — Outbox 事件处理（Java）</summary>
+    <div class="code-block">
+<span class="cm">// RelationEventProcessor.java</span>
+<span class="kw">public void</span> process(RelationEvent evt) {
+    <span class="cm">// ① 去重key: dedup:rel:{type}:{from}:{to}:{id}</span>
+    <span class="cm">//    包含 following.id 保证：取关后重关注不会误判为重复</span>
+    String dk = <span class="str">"dedup:rel:"</span> + evt.type() + <span class="str">":"</span>
+              + evt.fromUserId() + <span class="str">":"</span> + evt.toUserId()
+              + <span class="str">":"</span> + (evt.id() == <span class="kw">null</span> ? <span class="str">"0"</span> : String.valueOf(evt.id()));
+
+    <span class="cm">// ② SETNX: 幂等去重。已存在→跳过，首次→处理</span>
+    <span class="kw">Boolean</span> first = redis.opsForValue()
+        .setIfAbsent(dk, <span class="str">"1"</span>, Duration.ofMinutes(10));
+    <span class="kw">if</span> (first == <span class="kw">null</span> || !first) <span class="kw">return</span>;  <span class="cm">// 重复事件，跳过</span>
+
+    <span class="kw">if</span> (<span class="str">"FollowCreated"</span>.equals(evt.type())) {
+        <span class="cm">// ③ 异步落库：投影表写入（字段反转）</span>
+        mapper.insertFollower(evt.id(), evt.toUserId(), evt.fromUserId(), 1);
+
+        <span class="kw">long</span> now = System.currentTimeMillis();
+        <span class="cm">// ④ ZSet 缓存：关注列表 + 粉丝列表双向更新</span>
+        redis.opsForZSet().add(<span class="str">"uf:flws:"</span> + evt.fromUserId(),
+            String.valueOf(evt.toUserId()), now);
+        redis.opsForZSet().add(<span class="str">"uf:fans:"</span> + evt.toUserId(),
+            String.valueOf(evt.fromUserId()), now);
+        redis.expire(<span class="str">"uf:flws:"</span> + evt.fromUserId(), Duration.ofHours(2));
+        redis.expire(<span class="str">"uf:fans:"</span> + evt.toUserId(), Duration.ofHours(2));
+
+        <span class="cm">// ⑤ 用户维度计数器：原子增量（Lua脚本）</span>
+        userCounterService.incrementFollowings(evt.fromUserId(), 1);
+        userCounterService.incrementFollowers(evt.toUserId(), 1);
+
+    } <span class="kw">else if</span> (<span class="str">"FollowCanceled"</span>.equals(evt.type())) {
+        <span class="cm">// 取关：软删除 + 移除ZSet + 计数器-1</span>
+        mapper.cancelFollower(evt.toUserId(), evt.fromUserId());
+        redis.opsForZSet().remove(<span class="str">"uf:flws:"</span> + evt.fromUserId(),
+            String.valueOf(evt.toUserId()));
+        redis.opsForZSet().remove(<span class="str">"uf:fans:"</span> + evt.toUserId(),
+            String.valueOf(evt.fromUserId()));
+        userCounterService.incrementFollowings(evt.fromUserId(), -1);
+        userCounterService.incrementFollowers(evt.toUserId(), -1);
+    }
+}</div>
+    <div class="callout warn">
+      <strong>注意：</strong> 如果第二步 ZSet 写失败（Redis OOM），follower 表已经写成功了 → 数据不一致。<br>
+      当前代码没有显式的补偿机制——依赖 300s 采样校验和 rebuildAllCounters() 被动修复。生产环境应加 ZSet 写入的异常处理或 DLQ。
+    </div>
+  </details>
+</div>
 <div class="fade-in" id="interview" style="margin-top:2.5rem">
   <div class="section-subtitle">面试实战</div>
   <h2 class="section-hero" style="font-size:1.8rem">深度面试拷打 50 题</h2>
@@ -864,6 +1359,7 @@ GET /api/v1/knowpost/feed?page=1&size=20  (uid=99)
 
 </main>
 
+
 <script>
 // Highlight active nav link on scroll
 const sections = document.querySelectorAll('[id]');
@@ -887,6 +1383,134 @@ document.querySelectorAll('.sidebar-nav a').forEach(a => {
     document.querySelector('.sidebar').classList.remove('open');
   });
 });
+
+// ======== Dark Mode Toggle ========
+const dmToggle = document.getElementById('dm-toggle');
+const dmIcon = document.getElementById('dm-icon');
+let darkMode = localStorage.getItem('darkMode') === 'true';
+applyDarkMode();
+
+dmToggle.addEventListener('click', () => {
+  darkMode = !darkMode;
+  localStorage.setItem('darkMode', darkMode);
+  applyDarkMode();
+});
+
+function applyDarkMode() {
+  if (darkMode) {
+    document.documentElement.style.setProperty('--bg-primary', '#0f172a');
+    document.documentElement.style.setProperty('--bg-secondary', '#1e293b');
+    document.documentElement.style.setProperty('--glass-bg', 'rgba(30,41,59,0.8)');
+    document.documentElement.style.setProperty('--glass-border', 'rgba(255,255,255,0.06)');
+    document.documentElement.style.setProperty('--text-main', '#e2e8f0');
+    document.documentElement.style.setProperty('--text-dim', '#94a3b8');
+    document.documentElement.style.setProperty('--text-ghost', '#64748b');
+    document.documentElement.style.setProperty('--shadow-md', '0 4px 6px -1px rgba(0,0,0,0.3)');
+    dmIcon.textContent = '☀️';
+  } else {
+    document.documentElement.style.setProperty('--bg-primary', '#fdfbf7');
+    document.documentElement.style.setProperty('--bg-secondary', '#f8f9fa');
+    document.documentElement.style.setProperty('--glass-bg', 'rgba(255,255,255,0.7)');
+    document.documentElement.style.setProperty('--glass-border', 'rgba(255,255,255,0.4)');
+    document.documentElement.style.setProperty('--text-main', '#1e293b');
+    document.documentElement.style.setProperty('--text-dim', '#475569');
+    document.documentElement.style.setProperty('--text-ghost', '#94a3b8');
+    document.documentElement.style.setProperty('--shadow-md', '0 4px 6px -1px rgba(0,0,0,0.1)');
+    dmIcon.textContent = '🌙';
+  }
+}
+
+// ======== Random Question Picker ========
+const questions = [
+  { id:'Q1', section:'计数', text:'为什么选 Redis 位图而不是 Set 或 HyperLogLog？' },
+  { id:'Q2', section:'计数', text:'位图按 32768 分片，这个数字怎么来的？换成 65536 会怎样？' },
+  { id:'Q3', section:'计数', text:'SDS 为什么用 4 字节大端 int32？' },
+  { id:'Q4', section:'计数', text:'TOGGLE_LUA 为什么要先 GETBIT 再 SETBIT？' },
+  { id:'Q5', section:'计数', text:'为什么用 Lua 脚本而不是 MULTI/EXEC 或 WATCH？' },
+  { id:'Q6', section:'计数', text:'INCR_FIELD_LUA 在读-改-写过程中如何防止并发覆盖？' },
+  { id:'Q7', section:'计数', text:'画出点赞的完整写入链路，每层挂了怎么恢复？' },
+  { id:'Q8', section:'计数', text:'为什么引入 Redis Hash 聚合桶？多这一层 hop 的 trade-off？' },
+  { id:'Q9', section:'计数', text:'@Scheduled 1s 扫描 agg:* 有问题吗？怎么优化？' },
+  { id:'Q10', section:'计数', text:'Kafka ack 和 HINCRBY 之间崩溃会怎样？' },
+  { id:'Q11', section:'计数', text:'重建期间有新的点赞写入，结果还准吗？' },
+  { id:'Q12', section:'计数', text:'三层保护（限流/锁/退避）分别解决什么问题？为什么 tryLock(0)？' },
+  { id:'Q13', section:'计数', text:'KEYS 命令在生产环境的替代方案？' },
+  { id:'Q14', section:'计数', text:'重建后为什么删聚合桶字段？' },
+  { id:'Q15', section:'计数', text:'CounterRebuildConsumer 从头回放 10 亿条事件会 OOM 吗？' },
+  { id:'Q16', section:'关系', text:'为什么维护 following + follower 两张表？' },
+  { id:'Q17', section:'关系', text:'rel_status 为什么用软删除？' },
+  { id:'Q18', section:'关系', text:'Outbox 为什么必须和 following 同事务？' },
+  { id:'Q19', section:'关系', text:'Outbox ID 为什么用随机 Long 而不是 Snowflake？' },
+  { id:'Q20', section:'关系', text:'Outbox 积压 100 万条，Canal 恢复后怎么处理？' },
+  { id:'Q21', section:'关系', text:'CanalKafkaBridge 为什么实现 SmartLifecycle？' },
+  { id:'Q22', section:'关系', text:'getWithoutAck + ack 是什么投递语义？' },
+  { id:'Q23', section:'关系', text:'Canal 为什么只转发 payload 字段？' },
+  { id:'Q24', section:'关系', text:'SETNX 去重 TTL 10 分钟够吗？' },
+  { id:'Q25', section:'关系', text:'follower 表写成功但 ZSet 写失败怎么恢复？' },
+  { id:'Q26', section:'关系', text:'用户关注后粉丝数 +1 延迟多少？能接受吗？' },
+  { id:'Q27', section:'关系', text:'为什么用 ZSet 缓存粉丝列表？score 存什么？' },
+  { id:'Q28', section:'关系', text:'大 V 的 Caffeine Top 缓存什么时候生效？' },
+  { id:'Q29', section:'关系', text:'ZSet 2h TTL 过期后 DB 回填有击穿风险吗？' },
+  { id:'Q30', section:'关系', text:'令牌桶 capacity=100 rate=1 怎么考虑的？' },
+  { id:'Q31', section:'关系', text:'300 秒抽样校验为什么不是每次？重建期间用户读到什么？' },
+  { id:'Q32', section:'Feed', text:'三级缓存 TTL 怎么定的？Caffeine 设为 60s 会怎样？' },
+  { id:'Q33', section:'Feed', text:'公共 Feed 用片段缓存，我的发布用整页缓存，为什么不同？' },
+  { id:'Q34', section:'Feed', text:'hourSlot 嵌在 key 里解决什么问题？' },
+  { id:'Q35', section:'Feed', text:'20 个帖子 x 2 次 GETBIT = 40 次 Redis 调用，怎么优化？' },
+  { id:'Q36', section:'Feed', text:'Caffeine 保留 liked/faved 但 Redis 不保留，为什么？' },
+  { id:'Q37', section:'Feed', text:'single-flight 锁 key 为什么用 idsKey 而不是 localPageKey？' },
+  { id:'Q38', section:'Feed', text:'持锁线程查 DB 慢（5s），其他等锁线程会怎样？' },
+  { id:'Q39', section:'Feed', text:'锁泄漏问题（remove 前抛异常）怎么修？' },
+  { id:'Q40', section:'Feed', text:'去掉随机抖动，所有 key 同时过期会怎样？' },
+  { id:'Q41', section:'Feed', text:'抖动范围怎么确定？为什么 hasMore 浮动 100% 而 item 只 50%？' },
+  { id:'Q42', section:'Feed', text:'为什么是分段滑动窗口而不是简单计数器 + 时间戳？' },
+  { id:'Q43', section:'Feed', text:'热点降了后 TTL 怎么缩短？' },
+  { id:'Q44', section:'Feed', text:'应用重启后热度丢失，冷启动期间发生什么？' },
+  { id:'Q45', section:'Feed', text:'反向索引过期但 Redis 页面 JSON 还在，会发生什么？' },
+  { id:'Q46', section:'Feed', text:'getExpire 返回 -1（无过期）或 -2（不存在）怎么处理？' },
+  { id:'Q47', section:'Feed', text:'反向索引只覆盖当前和上一小时，2 小时前的缓存能失效到吗？' },
+  { id:'Q48', section:'Feed', text:'QPS 从 1000 突增到 10000，瓶颈在哪？' },
+  { id:'Q49', section:'Feed', text:'Redis 完全挂了，Feed 系统还能服务吗？' },
+  { id:'Q50', section:'Feed', text:'新帖发布到出现在关注者 Feed 里，和 Twitter fan-out-on-write 有什么不同？' }
+];
+
+const quizBtn = document.getElementById('quiz-btn');
+const quizModal = document.getElementById('quiz-modal');
+const quizClose = document.getElementById('quiz-close');
+const quizQuestion = document.getElementById('quiz-question');
+const quizSection = document.getElementById('quiz-section');
+const quizQid = document.getElementById('quiz-qid');
+const quizNext = document.getElementById('quiz-next');
+const quizReveal = document.getElementById('quiz-reveal');
+const quizHint = document.getElementById('quiz-hint');
+let currentQ = null;
+
+quizBtn.addEventListener('click', pickRandom);
+quizNext.addEventListener('click', pickRandom);
+quizClose.addEventListener('click', () => quizModal.classList.remove('open'));
+quizModal.addEventListener('click', e => { if (e.target === quizModal) quizModal.classList.remove('open'); });
+quizReveal.addEventListener('click', () => {
+  if (quizHint) {
+    quizHint.style.display = 'block';
+    quizReveal.style.display = 'none';
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') quizModal.classList.remove('open');
+  if (e.key === 'n' && quizModal.classList.contains('open')) pickRandom();
+});
+
+function pickRandom() {
+  const q = questions[Math.floor(Math.random() * questions.length)];
+  currentQ = q;
+  quizQid.textContent = q.id;
+  quizSection.textContent = q.section;
+  quizSection.className = 'badge ' + (q.section === '计数' ? 'redis' : q.section === '关系' ? 'kafka' : 'mysql');
+  quizQuestion.textContent = q.text;
+  if (quizHint) { quizHint.style.display = 'none'; quizReveal.style.display = 'inline-flex'; }
+  quizModal.classList.add('open');
+}
 </script>
 
 </body>

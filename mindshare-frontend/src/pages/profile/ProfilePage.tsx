@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useParams } from "react-router-dom";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../../auth/AuthProvider";
 import { getProfile } from "../../api/profile";
@@ -32,8 +32,9 @@ function parseTagsJson(tagsJson?: string | null): string[] {
 
 export function ProfilePage() {
   const [searchParams] = useSearchParams();
+  const { userId: routeUserId } = useParams<{ userId?: string }>();
   const currentUser = useAuthStore((s) => s.user);
-  const profileUserId = searchParams.get("userId");
+  const profileUserId = routeUserId || searchParams.get("userId");
   const viewingUserId = profileUserId ? Number(profileUserId) : currentUser?.id;
   const isOwnProfile = !profileUserId || Number(profileUserId) === currentUser?.id;
 
