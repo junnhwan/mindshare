@@ -64,6 +64,9 @@ CREATE TABLE IF NOT EXISTS know_posts (
 CREATE INDEX IF NOT EXISTS idx_know_posts_creator_id ON know_posts(creator_id);
 CREATE INDEX IF NOT EXISTS idx_know_posts_status_visible_publish_time
     ON know_posts(status, visible, publish_time DESC);
+CREATE INDEX IF NOT EXISTS idx_know_posts_creator_ct ON know_posts(creator_id, create_time);
+CREATE INDEX IF NOT EXISTS idx_know_posts_status_ct ON know_posts(status, create_time);
+CREATE INDEX IF NOT EXISTS idx_know_posts_creator_status_pub ON know_posts(creator_id, status, publish_time);
 
 CREATE TABLE IF NOT EXISTS outbox (
     id BIGINT PRIMARY KEY,

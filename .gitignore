@@ -12,3 +12,8 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Personal files
+mycv.md
+zg-cv.png
+.claude/settings.local.json

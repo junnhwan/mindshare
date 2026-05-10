@@ -26,6 +26,16 @@ spring:
     uris: ${ES_URIS:http://localhost:9200}
     username: ${ES_USERNAME:elastic}
     password: ${ES_PASSWORD:changeme}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: mindshare
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
 mybatis:
   mapper-locations:
@@ -93,3 +103,12 @@ mindshare:
   elasticsearch:
     enabled: true
     index-name: ${ES_INDEX_NAME:mindshare_knowpost}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: false
