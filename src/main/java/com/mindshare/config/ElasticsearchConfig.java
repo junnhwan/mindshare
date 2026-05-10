@@ -3,6 +3,7 @@ package com.mindshare.config;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.json.jackson.JacksonJsonpMapper;
 import co.elastic.clients.transport.rest_client.RestClientTransport;
+import lombok.Data;
 import org.apache.http.HttpHost;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
@@ -37,26 +38,11 @@ public class ElasticsearchConfig {
         return new ElasticsearchClient(new RestClientTransport(restClient, new JacksonJsonpMapper()));
     }
 
+    @Data
     @ConfigurationProperties(prefix = "mindshare.elasticsearch")
     public static class MindShareElasticsearchProperties {
 
         private boolean enabled = true;
         private String indexName = "mindshare_knowpost";
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
-        }
-
-        public String getIndexName() {
-            return indexName;
-        }
-
-        public void setIndexName(String indexName) {
-            this.indexName = indexName;
-        }
     }
 }

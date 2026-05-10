@@ -1,30 +1,25 @@
 package com.mindshare.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
-import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration(proxyBeanMethods = false)
 public class RedissonConfig {
 
-    @Bean(name = "mindshareRedisTemplate")
-    public RedisTemplate<String, Object> mindshareRedisTemplate(
-            RedisConnectionFactory redisConnectionFactory,
-            ObjectMapper objectMapper
-    ) {
-        RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
-        redisTemplate.setConnectionFactory(redisConnectionFactory);
-
-        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(objectMapper);
-        redisTemplate.setKeySerializer(new StringRedisSerializer());
-        redisTemplate.setValueSerializer(serializer);
-        redisTemplate.setHashKeySerializer(new StringRedisSerializer());
-        redisTemplate.setHashValueSerializer(serializer);
-        redisTemplate.afterPropertiesSet();
-        return redisTemplate;
+    @Bean
+    @ConditionalOnProperty(prefix = "mindshare.redisson", name = "enabled", havingValue = "true", matchIfMissing = true)
+    public RedissonClient redissonClient(RedisProperties redisProperties) {
+        Config config = new Config();
+        String address = "redis://" + redisProperties.getHost() + ":" + redisProperties.getPort();
+        config.useSingleServer()
+                .setAddress(address)
+                .setPassword(redisProperties.getPassword())
+                .setDatabase(redisProperties.getDatabase());
+        return Redisson.create(config);
     }
 }

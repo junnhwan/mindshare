@@ -1,4 +1,7 @@
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
   datasource:
     url: jdbc:h2:mem:mindshare;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
     username: sa
@@ -10,6 +13,8 @@ spring:
       schema-locations: file:db/schema.sql
 
 mindshare:
+  redisson:
+    enabled: false
   cache:
     redis-enabled: false
   counter:
