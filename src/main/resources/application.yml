@@ -46,6 +46,11 @@ auth:
     code-length: ${AUTH_CODE_LENGTH:6}
     ttl: ${AUTH_CODE_TTL:PT5M}
     max-attempts: ${AUTH_CODE_MAX_ATTEMPTS:5}
+    send-interval: ${AUTH_CODE_SEND_INTERVAL:PT60S}
+    daily-limit: ${AUTH_CODE_DAILY_LIMIT:10}
+  password:
+    bcrypt-strength: ${AUTH_BCRYPT_STRENGTH:12}
+    min-length: ${AUTH_PASSWORD_MIN_LENGTH:8}
 
 oss:
   endpoint: ${OSS_ENDPOINT:https://oss-cn-hangzhou.aliyuncs.com}

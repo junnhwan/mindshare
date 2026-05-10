@@ -12,6 +12,7 @@ public class AuthProperties {
 
     private Jwt jwt = new Jwt();
     private Verification verification = new Verification();
+    private Password password = new Password();
 
     @Data
     public static class Jwt {
@@ -29,5 +30,14 @@ public class AuthProperties {
         private int codeLength = 6;
         private Duration ttl = Duration.ofMinutes(5);
         private int maxAttempts = 5;
+        private Duration sendInterval = Duration.ofSeconds(60);
+        private int dailyLimit = 10;
+    }
+
+    @Data
+    public static class Password {
+
+        private int bcryptStrength = 12;
+        private int minLength = 8;
     }
 }

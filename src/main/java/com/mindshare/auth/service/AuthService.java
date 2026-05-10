@@ -11,6 +11,7 @@ import com.mindshare.auth.api.dto.TokenRefreshRequest;
 import com.mindshare.auth.api.dto.TokenResponse;
 import com.mindshare.auth.audit.LoginLog;
 import com.mindshare.auth.audit.LoginLogMapper;
+import com.mindshare.auth.config.AuthProperties;
 import com.mindshare.auth.model.ClientInfo;
 import com.mindshare.auth.model.IdentifierType;
 import com.mindshare.auth.token.JwtService;
@@ -49,6 +50,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final RefreshTokenStore refreshTokenStore;
     private final LoginLogMapper loginLogMapper;
+    private final AuthProperties authProperties;
 
     public AuthService(
             UserService userService,
@@ -56,7 +58,8 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             RefreshTokenStore refreshTokenStore,
-            LoginLogMapper loginLogMapper
+            LoginLogMapper loginLogMapper,
+            AuthProperties authProperties
     ) {
         this.userService = userService;
         this.verificationService = verificationService;
@@ -64,6 +67,7 @@ public class AuthService {
         this.jwtService = jwtService;
         this.refreshTokenStore = refreshTokenStore;
         this.loginLogMapper = loginLogMapper;
+        this.authProperties = authProperties;
     }
 
     @Transactional
@@ -218,14 +222,15 @@ public class AuthService {
     }
 
     private void validatePassword(String password) {
-        if (!StringUtils.hasText(password) || password.trim().length() < 8) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "password must be at least 8 chars");
+        int minLength = authProperties.getPassword().getMinLength();
+        if (!StringUtils.hasText(password) || password.trim().length() < minLength) {
+            throw new BusinessException(ErrorCode.PASSWORD_POLICY_VIOLATION, ErrorCode.PASSWORD_POLICY_VIOLATION.getDefaultMessage());
         }
         String text = password.trim();
         boolean hasLetter = text.chars().anyMatch(Character::isLetter);
         boolean hasDigit = text.chars().anyMatch(Character::isDigit);
         if (!hasLetter || !hasDigit) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "password must include letters and digits");
+            throw new BusinessException(ErrorCode.PASSWORD_POLICY_VIOLATION, ErrorCode.PASSWORD_POLICY_VIOLATION.getDefaultMessage());
         }
     }
 
