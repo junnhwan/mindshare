@@ -28,6 +28,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -390,7 +391,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         }
         try {
             String json = objectMapper.writeValueAsString(response);
-            stringRedisTemplate.opsForValue().set(key, json, cacheProperties.getDetailTtl());
+            stringRedisTemplate.opsForValue().set(key, json, Duration.ofSeconds(cacheProperties.getL2().getDetailCfg().getTtlSeconds()));
         } catch (Exception ignored) {
         }
     }

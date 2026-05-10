@@ -128,7 +128,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         }
         FeedPageResponse response = new FeedPageResponse(mapRows(rows), safePage, safeSize, hasMore);
         feedMineCache.put(key, response);
-        writeRedis(key, response, cacheProperties.getMyFeedTtl().getSeconds());
+        writeRedis(key, response, cacheProperties.getL2().getMineCfg().getTtlSeconds());
         return enrichResponse(response, creatorId);
     }
 
@@ -241,7 +241,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
     private void cachePublicFeed(String key, FeedPageResponse response) {
         feedPublicCache.put(key, response);
         trackPublicPage(key, response.items());
-        writeRedis(key, response, cacheProperties.getPublicFeedTtl().getSeconds());
+        writeRedis(key, response, cacheProperties.getL2().getPublicCfg().getTtlSeconds());
     }
 
     private FeedPageResponse enrichResponse(FeedPageResponse response, Long currentUserIdNullable) {

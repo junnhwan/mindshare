@@ -63,11 +63,25 @@ oss:
 mindshare:
   cache:
     redis-enabled: true
-    feed-maximum-size: 128
-    detail-maximum-size: 256
-    public-feed-ttl: PT5M
-    my-feed-ttl: PT3M
-    detail-ttl: PT5M
+    l2:
+      public-cfg:
+        ttl-seconds: 300
+        max-size: 128
+      mine-cfg:
+        ttl-seconds: 180
+        max-size: 128
+      detail-cfg:
+        ttl-seconds: 300
+        max-size: 256
+    hotkey:
+      window-seconds: 60
+      segment-seconds: 10
+      level-low: 10
+      level-medium: 50
+      level-high: 100
+      extend-low-seconds: 30
+      extend-medium-seconds: 120
+      extend-high-seconds: 300
   counter:
     redis-enabled: true
   elasticsearch:
