@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>面试深度拷打 — MindShare 技术拆解</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #fdfbf7;
+  --bg-secondary: #f8f9fa;
+  --glass-bg: rgba(255,255,255,0.7);
+  --glass-border: rgba(255,255,255,0.4);
+  --brand-azure: #38bdf8;
+  --brand-azure-deep: #0369a1;
+  --brand-warm: #f59e0b;
+  --brand-danger: #ef4444;
+  --brand-success: #10b981;
+  --text-main: #1e293b;
+  --text-dim: #475569;
+  --text-ghost: #94a3b8;
+  --accent-glow: rgba(56,189,248,0.15);
+  --font-sans: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-xl: 32px;
+  --radius-lg: 20px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+  --sidebar-w: 280px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-primary);
+  color: var(--text-main);
+  line-height: 1.7;
+  display: flex;
+  min-height: 100vh;
+}
+
+.mesh-gradient {
+  position: fixed; inset: 0; z-index: -2;
+  background:
+    radial-gradient(at 0% 0%, rgba(56,189,248,0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(245,158,11,0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(56,189,248,0.08) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(245,158,11,0.05) 0px, transparent 50%);
+}
+
+.noise-overlay {
+  position: fixed; inset: 0; z-index: -1; opacity: 0.03; pointer-events: none;
+}
+
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-w); height: 100vh; position: sticky; top: 0;
+  background: rgba(248,250,252,0.6); backdrop-filter: blur(12px);
+  border-right: 1px solid var(--glass-border);
+  padding: 2rem 0; overflow-y: auto; flex-shrink: 0; z-index: 30;
+}
+
+.sidebar-header {
+  padding: 0 1.5rem 1.5rem; border-bottom: 1px solid var(--glass-border); margin-bottom: 0.5rem;
+}
+
+.sidebar-header h1 {
+  font-size: 1rem; font-weight: 800; color: var(--text-main); line-height: 1.3;
+}
+.sidebar-header .sub {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--text-ghost); margin-top: 4px;
+}
+
+.sidebar-nav { list-style: none; padding: 0; }
+
+.sidebar-nav li a {
+  display: block; padding: 0.55rem 1.5rem; font-size: 0.82rem; font-weight: 500;
+  color: var(--text-dim); text-decoration: none; transition: all 0.15s;
+  border-left: 3px solid transparent;
+}
+.sidebar-nav li a:hover, .sidebar-nav li a.active {
+  background: rgba(56,189,248,0.08); color: var(--text-main); border-left-color: var(--brand-azure);
+}
+.sidebar-nav li a.topic-main {
+  font-weight: 700; font-size: 0.85rem; color: var(--text-main);
+  padding-top: 1rem; margin-top: 0.25rem; border-top: 1px solid var(--glass-border);
+}
+.sidebar-nav li a.topic-main:first-child { border-top: none; margin-top: 0; }
+
+/* Main */
+.main { flex: 1; max-width: 900px; padding: 3rem 2.5rem 6rem; }
+
+.glass-card {
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg); padding: 2rem; box-shadow: var(--shadow-md);
+  transition: all 0.3s cubic-bezier(0.4,0,0.2,1); margin-bottom: 1.5rem;
+}
+.glass-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-xl); border-color: rgba(56,189,248,0.3); }
+
+.section-hero {
+  font-size: 2.2rem; font-weight: 900; letter-spacing: -0.03em; margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+
+.section-subtitle {
+  font-size: 0.75rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--text-ghost); margin-bottom: 1rem;
+}
+
+/* Collapsible sections */
+details.glass-card { cursor: default; }
+details.glass-card > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center;
+  gap: 0.5rem; font-weight: 700; font-size: 1.1rem; color: var(--text-main);
+  padding: 0.25rem 0; user-select: none;
+}
+details.glass-card > summary::-webkit-details-marker { display: none; }
+details.glass-card > summary::before {
+  content: '▸'; display: inline-block; width: 20px; font-size: 0.9rem;
+  transition: transform 0.2s; color: var(--brand-azure);
+}
+details.glass-card[open] > summary::before { transform: rotate(90deg); }
+details.glass-card > summary:hover { color: var(--brand-azure-deep); }
+
+/* Code blocks */
+.code-block {
+  background: #0f172a; color: #e2e8f0; font-family: var(--font-mono); font-size: 0.8rem;
+  line-height: 1.65; border-radius: var(--radius-md); padding: 1.2rem 1.4rem;
+  overflow-x: auto; margin: 1rem 0; position: relative;
+}
+.code-block .kw { color: #f59e0b; } .code-block .str { color: #10b981; }
+.code-block .ty { color: #38bdf8; } .code-block .cm { color: #94a3b8; }
+.code-block .fn { color: #ef4444; }
+
+.code-inline {
+  background: rgba(0,0,0,0.05); padding: 0.15em 0.4em; border-radius: 4px;
+  font-family: var(--font-mono); font-size: 0.85em; font-weight: 500;
+}
+
+/* ASCII diagrams */
+.diagram {
+  background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.06);
+  border-radius: var(--radius-md); padding: 1.2rem 1.4rem;
+  font-family: var(--font-mono); font-size: 0.78rem; line-height: 1.45;
+  white-space: pre; overflow-x: auto; margin: 1rem 0;
+}
+
+/* Tables */
+table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  margin: 1rem 0; font-size: 0.88rem;
+}
+thead th {
+  background: rgba(0,0,0,0.03); font-weight: 700; font-size: 0.75rem;
+  text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim);
+  padding: 0.7rem 1rem; text-align: left; border-bottom: 2px solid rgba(0,0,0,0.06);
+}
+tbody td {
+  padding: 0.6rem 1rem; border-bottom: 1px solid rgba(0,0,0,0.04);
+  color: var(--text-dim); vertical-align: top;
+}
+tbody tr:hover td { background: rgba(56,189,248,0.03); }
+
+/* Callouts */
+.callout {
+  border-left: 4px solid var(--brand-azure); background: rgba(56,189,248,0.06);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 1rem 1.3rem;
+  margin: 1rem 0; font-size: 0.9rem;
+}
+.callout.warn { border-left-color: var(--brand-warm); background: rgba(245,158,11,0.06); }
+.callout.danger { border-left-color: var(--brand-danger); background: rgba(239,68,68,0.05); }
+.callout.good { border-left-color: var(--brand-success); background: rgba(16,185,129,0.06); }
+
+/* Thinking dots */
+.thinking-dots { display: flex; gap: 6px; align-items: center; padding: 1rem 0; }
+.thinking-dots .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--brand-azure); animation: pulse 1.5s infinite; }
+.thinking-dots .dot:nth-child(2) { animation-delay: 0.3s; }
+.thinking-dots .dot:nth-child(3) { animation-delay: 0.6s; }
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.5; }
+}
+
+/* Key index grid */
+.key-grid {
+  display: grid; grid-template-columns: 1fr 100px 1fr 80px 1fr;
+  gap: 0; font-size: 0.78rem; font-family: var(--font-mono);
+  border: 1px solid rgba(0,0,0,0.06); border-radius: var(--radius-md); overflow: hidden;
+}
+.key-grid > * { padding: 0.45rem 0.7rem; }
+.key-grid .kh { background: rgba(0,0,0,0.03); font-weight: 700; font-family: var(--font-sans);
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
+.key-grid .kr { border-top: 1px solid rgba(0,0,0,0.04); }
+
+/* Badge */
+.badge {
+  display: inline-block; padding: 0.15em 0.55em; border-radius: 100px;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em;
+}
+.badge.redis { background: rgba(220,38,38,0.1); color: #dc2626; }
+.badge.kafka { background: rgba(56,189,248,0.15); color: #0369a1; }
+.badge.mysql { background: rgba(245,158,11,0.12); color: #b45309; }
+.badge.java { background: rgba(239,68,68,0.08); color: #b91c1c; }
+
+/* Mobile */
+.menu-toggle {
+  display: none; position: fixed; top: 1rem; left: 1rem; z-index: 100;
+  width: 40px; height: 40px; border-radius: var(--radius-sm); border: 1px solid var(--glass-border);
+  background: var(--glass-bg); backdrop-filter: blur(8px); cursor: pointer; align-items: center; justify-content: center;
+}
+@media (max-width: 768px) {
+  .sidebar { position: fixed; left: 0; top: 0; transform: translateX(-100%); transition: transform 0.3s; z-index: 50; }
+  .sidebar.open { transform: translateX(0); }
+  .menu-toggle { display: flex; }
+  .main { padding: 2rem 1rem; }
+  .section-hero { font-size: 1.6rem; }
+  .key-grid { grid-template-columns: 1fr 1fr; }
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.05); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.1); }
+
+/* Comparison box */
+.cmp-box {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0;
+}
+.cmp-box .side {
+  border: 1px solid rgba(0,0,0,0.06); border-radius: var(--radius-md); padding: 1rem;
+}
+.cmp-box .side h4 { font-size: 0.85rem; font-weight: 800; margin-bottom: 0.5rem; }
+.cmp-box .side.good { border-left: 4px solid var(--brand-success); }
+.cmp-box .side.risk { border-left: 4px solid var(--brand-warm); }
+
+/* Fade-in animation */
+.fade-in { animation: fadeIn 0.6s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<div class="mesh-gradient"></div>
+<div class="noise-overlay">
+  <svg width="100%" height="100%"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(#n)"/></svg>
+</div>
+
+<button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')" aria-label="菜单">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+</button>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <h1>MindShare 技术拆解</h1>
+    <div class="sub">面试深度准备</div>
+  </div>
+  <ul class="sidebar-nav">
+    <li><a href="#resume" class="topic-main">简历描述</a></li>
+    <li><a href="#topic1" class="topic-main">一、互动计数</a></li>
+    <li><a href="#t1-0">　从一个帖子说起</a></li>
+    <li><a href="#t1-1">　三个 Redis 结构</a></li>
+    <li><a href="#t1-2">　写入链路</a></li>
+    <li><a href="#t1-3">　读取链路</a></li>
+    <li><a href="#t1-4">　BITCOUNT 重建</a></li>
+    <li><a href="#t1-5">　灾备恢复</a></li>
+    <li><a href="#t1-6">　Key 索引 & 话术</a></li>
+    <li><a href="#topic2" class="topic-main">二、用户关系</a></li>
+    <li><a href="#t2-0">　为什么两张表</a></li>
+    <li><a href="#t2-1">　写入链路 17 步</a></li>
+    <li><a href="#t2-2">　设计深挖</a></li>
+    <li><a href="#t2-3">　读取链路</a></li>
+    <li><a href="#t2-4">　计数器自愈</a></li>
+    <li><a href="#t3-0" class="topic-main">三、Feed 流</a></li>
+    <li><a href="#t3-0">　三种场景三种策略</a></li>
+    <li><a href="#t3-1">　公共 Feed 请求链路</a></li>
+    <li><a href="#t3-2">　设计深挖</a></li>
+    <li><a href="#t3-3">　HotKeyDetector</a></li>
+    <li><a href="#t3-4">　三种缓存问题</a></li>
+    <li><a href="#interview" class="topic-main" style="color:var(--brand-azure)">面试拷打 50 题 ↓</a></li>
+  </ul>
+</aside>
+
+<main class="main">
+
+<!-- ==================== RESUME ==================== -->
+<div class="fade-in" id="resume">
+  <div class="section-subtitle">简历描述</div>
+  <h1 class="section-hero">三个技术亮点</h1>
+
+  <div class="glass-card" style="margin-top:1.5rem">
+    <p style="font-size:0.88rem;color:var(--text-dim);margin-bottom:1rem;">
+      以下均基于参考项目 <code class="code-inline">zhiguang_be</code> 的完整实现。
+    </p>
+
+    <div style="display:flex;flex-direction:column;gap:0.8rem;">
+      <div style="padding:1rem;background:rgba(56,189,248,0.04);border-radius:var(--radius-md);border-left:3px solid var(--brand-azure)">
+        <strong style="font-size:0.9rem">互动计数（点赞/收藏）</strong><br>
+        <span style="font-size:0.82rem;color:var(--text-dim)">Redis 分片位图 + Lua 幂等写入 → Kafka 异步聚合 → 固定结构二进制计数（SDS）<br>BITCOUNT 按需重建，辅以 分布式锁 + 限流 + 指数退避 三层保护</span>
+      </div>
+      <div style="padding:1rem;background:rgba(245,158,11,0.04);border-radius:var(--radius-md);border-left:3px solid var(--brand-warm)">
+        <strong style="font-size:0.9rem">用户关系（关注/粉丝）</strong><br>
+        <span style="font-size:0.82rem;color:var(--text-dim)">双表镜像 + Outbox 事件驱动 — 同事务写 following + Outbox → Canal 读 binlog → Kafka → 异步写 follower + ZSet + 计数器</span>
+      </div>
+      <div style="padding:1rem;background:rgba(16,185,129,0.04);border-radius:var(--radius-md);border-left:3px solid var(--brand-success)">
+        <strong style="font-size:0.9rem">Feed 流</strong><br>
+        <span style="font-size:0.82rem;color:var(--text-dim)">Caffeine 本地 + Redis 片段缓存（按小时槽分片） → 反向索引精准失效<br>滑动窗口 HotKeyDetector + 动态 TTL + 随机抖动 + single-flight</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TOPIC 1: COUNTER ==================== -->
+<div class="fade-in" id="topic1" style="margin-top:2rem">
+  <div class="section-subtitle">Topic 1</div>
+  <h2 class="section-hero" style="font-size:1.8rem">互动计数 — 从零开始</h2>
+
+  <!-- T1-0 -->
+  <details class="glass-card" id="t1-0" open>
+    <summary>0. 从一个帖子说起</summary>
+    <p>帖子 123 被 <strong>3 个用户</strong>点过赞（5、99、203），被 <strong>1 个用户</strong>收藏（99）。</p>
+    <table>
+      <thead><tr><th>问题</th><th>例子</th><th>答案</th></tr></thead>
+      <tbody>
+        <tr><td>"某个用户点过吗？"</td><td>用户 99 点过赞吗？</td><td><strong>是</strong></td></tr>
+        <tr><td>"总共有多少？"</td><td>几个赞？</td><td><strong>3</strong></td></tr>
+      </tbody>
+    </table>
+    <p>只存数字 <code class="code-inline">likeCount=3</code> → 回答不了"谁点过"。只存集合 <code class="code-inline">{5,99,203}</code> → 100 万点赞的 Set 占 30-50MB。</p>
+    <p><strong>这个项目同时用两个结构：</strong></p>
+    <div class="code-block">
+<span class="cm"># 位图 — "哪些用户点了赞"</span>
+bm:like:knowpost:123:0  →  bit[5]=1, bit[99]=1, bit[203]=1
+
+<span class="cm"># 20 字节二进制串 — "总共几个赞/收藏"</span>
+cnt:v1:knowpost:123  →  byte[4..7]=3(like), byte[8..11]=1(fav)
+    </div>
+    <div class="callout">
+      <strong>为什么查总数不直接用 BITCOUNT？</strong> 百万点赞 ≈ 30 个分片 key。每次读都 BITCOUNT 30 次太贵。不如维护一个 20 字节的小结构，一次 GET 搞定。
+    </div>
+    <p>代码里管位图叫<strong>"事实层"</strong>（source of truth），管二进制串叫<strong>"计数快照"（SDS）</strong>——就是一个固定格式的 byte 数组，没什么玄学。</p>
+  </details>
+
+  <!-- T1-1 -->
+  <details class="glass-card" id="t1-1">
+    <summary>1. 三个 Redis 结构 — 各司其职</summary>
+
+    <h4 style="margin-top:1rem">1.1 位图 — 点赞/取消时写入</h4>
+    <div class="code-block">
+bm:like:knowpost:123:0     ← chunk=0, 存 userId 0~32767
+bm:like:knowpost:123:1     ← chunk=1, 存 userId 32768~65535
+
+<span class="cm"># chunk 怎么算？</span>
+userId = 100000  →  chunk = 100000/32768 = <span class="kw">3</span>
+                  →  bit   = 100000%32768 = <span class="kw">1696</span></div>
+    <p>每个 chunk 固定 <strong>32768 位 = 4KB</strong>。1000 万点赞不是 1000 万位的单 key，而是 ~305 个各 4KB 的小 key——避免大 key 导致 Redis 主从同步阻塞。</p>
+
+    <h4 style="margin-top:1.2rem">1.2 计数快照（SDS）— 读计数的入口</h4>
+    <div class="diagram">
+cnt:v1:knowpost:123  →  20 字节, 5 字段 × 4 字节大端 int32
+  byte 0-3:   0  (read 预留)
+  byte 4-7:   3  (like count)
+  byte 8-11:  1  (fav count)
+  byte 12-15: 0  (comment 预留)
+  byte 16-19: 0  (repost 预留)</div>
+    <p>
+      <span class="badge redis">设计决策</span>
+      4 字节 int32（最大 21 亿）够用且省空间；大端序 = Java ByteBuffer 默认 + 网络字节序；固定长度 20 字节 → 长度校验就是完整性校验。
+    </p>
+
+    <h4 style="margin-top:1.2rem">1.3 聚合桶（Redis Hash 缓冲）— 写计数的入口</h4>
+    <div class="code-block">
+agg:v1:knowpost:123  →  Redis Hash
+  field "1" → "5"     (like 待处理增量 +5)
+  field "2" → "-2"    (fav 待处理增量 -2)</div>
+    <p>
+      <span class="badge kafka">核心价值</span>
+      Kafka 每秒几千个点赞事件。如果每个事件都直接改 SDS（Lua GET→解码→+1→编码→SET），写放大严重。
+      聚合桶先 <code class="code-inline">HINCRBY</code> 累加（单命令），每秒只折叠一次。<strong>1000 次 HINCRBY → 1 次 Lua 脚本</strong>。
+    </p>
+
+    <div class="callout good">
+      <strong>比喻：</strong> 位图 = 考勤表（每人一格） · 计数快照 = 黑板上的数字 · 聚合桶 = 助教手里的便签<br>
+      查某人是否出席 → 考勤表 · 查总人数 → 黑板 · 有人进出 → 先记便签，每分钟擦一次黑板 · 黑板数字坏了 → 重新数考勤表
+    </div>
+  </details>
+
+  <!-- T1-2 -->
+  <details class="glass-card" id="t1-2">
+    <summary>2. 写入链路 — 从 HTTP 到 SDS</summary>
+    <div class="diagram">
+HTTP POST /api/v1/action/like  {"entityType":"knowpost","entityId":"123"}
+  │
+  ▼ <span class="badge java">Java</span>
+CounterServiceImpl.like() → toggle()
+  ├─ 1. chunk = uid/32768, bit = uid%32768
+  ├─ 2. <span class="badge redis">Redis Lua</span> TOGGLE_LUA: GETBIT→检查→SETBIT (原子)
+  └─ 3. changed=1 → ① Kafka: CounterEvent  ② Spring Event
+
+  ▼ <span class="badge kafka">Kafka</span>
+CounterAggregationConsumer.onMessage()
+  ├─ 4. HINCRBY agg:v1:knowpost:123 "1" 1
+  └─ ack → 只有成功才提交位点
+
+  ▼ <span class="badge redis">Redis</span> @Scheduled(fixedDelay=1000)
+CounterAggregationConsumer.flush()
+  ├─ 5. 扫描 agg:* key → INCR_FIELD_LUA: delta 折叠进 SDS
+  │                    → DECR_FIELD_LUA: 扣减聚合桶 field
+  └─ Hash 变空 → DELETE agg key</div>
+
+    <div class="callout">
+      <strong>面试必问：为什么 TOGGLE_LUA 要先 GETBIT 再 SETBIT？</strong><br>
+      SETBIT 返回旧值，但两个并发请求都 SETBIT offset=5 to 1：请求 A 返回 0（旧值）→ 产生事件；请求 B 返回 1（旧值，因 A 先执行）→ 也产生事件。两次都以为自己改变了状态！<br>
+      <strong>正确做法：Lua 里先 GETBIT，已是目标状态就 return 0，不是才 SETBIT。</strong>判断 + 写入在 Redis 单线程内原子完成。
+    </div>
+  </details>
+
+  <!-- T1-3 -->
+  <details class="glass-card" id="t1-3">
+    <summary>3. 读取链路 &amp; 判存</summary>
+    <div class="cmp-box">
+      <div class="side good">
+        <h4>getCounts() 单个读</h4>
+        <div class="diagram" style="font-size:0.7rem">GET cnt:v1:knowpost:123 → 20字节
+正常: byte[4..7]解出like, [8..11]解出fav
+异常: 长度≠20 → 触发重建</div>
+      </div>
+      <div class="side good">
+        <h4>getCountsBatch() 批量读</h4>
+        <div class="diagram" style="font-size:0.7rem">Pipeline GET 20个SDS key
+一次网络往返
+缺失的返回 0，不触发重建</div>
+      </div>
+    </div>
+    <div class="callout good">
+      <strong>isLiked() 直接读位图，不依赖 SDS。</strong> 即使 SDS 挂了在重建，用户看到的点赞状态永远准——因为位图是事实源。
+    </div>
+  </details>
+
+  <!-- T1-4 -->
+  <details class="glass-card" id="t1-4">
+    <summary>4. BITCOUNT 重建 — 三层保护机制</summary>
+    <p><strong>触发条件：</strong>SDS key 不存在，或长度 ≠ 20。原因：Redis 内存淘汰、运维误删、主从切换。</p>
+
+    <div class="diagram">
+触发 getCounts()，SDS 缺失
+  │
+  ├─ <span style="color:#f59e0b">第0层 inBackoff()</span> → 退避窗口内？直接返回0
+  │
+  ├─ <span style="color:#ef4444">第1层 限流</span> Redisson RRateLimiter 3 permits/10s
+  │   拿不到 → escalateBackoff() → 返回0
+  │
+  ├─ <span style="color:#ef4444">第2层 分布式锁</span> RLock.tryLock(0) 非阻塞
+  │   拿不到 → escalateBackoff() → 返回0
+  │   <span class="cm"># tryLock(0)：不等锁。别的线程在做，下次请求SDS已存在，直接读就行</span>
+  │
+  ├─ <span style="color:#10b981">第3层 持锁重建</span>
+  │   ① KEYS bm:like:knowpost:123:*  → Pipeline BITCOUNT → sum
+  │   ② SET cnt:v1:knowpost:123 = 新SDS
+  │   ③ HDEL agg:v1:knowpost:123 "1" "2" ← 清聚合桶，防重复加算
+  │   ④ resetBackoff()
+  │
+  └─ <span style="color:#f59e0b">第4层 指数退避</span>
+      连续失败 → delay=500ms×2^exp, cap=30s, exp cap=10</div>
+
+    <table>
+      <thead><tr><th>机制</th><th>解决的问题</th><th>不解决的</th></tr></thead>
+      <tbody>
+        <tr><td>限流</td><td>同一实体重建频率过高，刷爆 Redis</td><td>不同实体各自有限流器</td></tr>
+        <tr><td>分布式锁</td><td>同一实体的并发重建竞争</td><td>锁超时（watchdog 自动续）</td></tr>
+        <tr><td>指数退避</td><td>反复失败时快速失败</td><td>退避窗口内返回0，数据不准</td></tr>
+      </tbody>
+    </table>
+    <p style="text-align:center;font-weight:700;color:var(--brand-azure)">先限流（粗筛）→ 再抢锁（精筛）→ 失败就退避（自保）</p>
+  </details>
+
+  <!-- T1-5 & T1-6 -->
+  <details class="glass-card" id="t1-5">
+    <summary>5. 灾备 &amp; 完整 Key 索引</summary>
+
+    <h4>CounterRebuildConsumer（默认关闭）</h4>
+    <div class="diagram">
+场景: Redis被清空，所有SDS丢失
+  → counter.rebuild.enabled=true
+  → auto.offset.reset=earliest 从头消费Kafka
+  → 每条事件直接 INCR_FIELD_LUA 折叠进SDS
+  → 消费完关闭
+  <span class="cm"># 平时不用开——正常consumer已在维护SDS</span></div>
+
+    <h4 style="margin-top:1.5rem">完整 Redis Key 索引</h4>
+    <div class="key-grid">
+      <div class="kh">Key Pattern</div><div class="kh">类型</div><div class="kh">示例</div><div class="kh">TTL</div><div class="kh">说明</div>
+      <div class="kr"><code>bm:{metric}:{etype}:{eid}:{chunk}</code></div><div class="kr">Bitmap</div><div class="kr">bm:like:knowpost:123:0</div><div class="kr">无</div><div class="kr">事实层</div>
+      <div class="kr"><code>cnt:{schema}:{etype}:{eid}</code></div><div class="kr">String</div><div class="kr">cnt:v1:knowpost:123</div><div class="kr">无</div><div class="kr">20字节SDS</div>
+      <div class="kr"><code>agg:{schema}:{etype}:{eid}</code></div><div class="kr">Hash</div><div class="kr">agg:v1:knowpost:123</div><div class="kr">用后删除</div><div class="kr">增量桶</div>
+      <div class="kr"><code>rl:sds-rebuild:{etype}:{eid}</code></div><div class="kr">RateLim</div><div class="kr">rl:sds-rebuild:knowpost:123</div><div class="kr">配置</div><div class="kr">限流器</div>
+      <div class="kr"><code>lock:sds-rebuild:{etype}:{eid}</code></div><div class="kr">RLock</div><div class="kr">lock:sds-rebuild:knowpost:123</div><div class="kr">watchdog30s</div><div class="kr">分布式锁</div>
+      <div class="kr"><code>backoff:sds-rebuild:until:{e}:{eid}</code></div><div class="kr">String</div><div class="kr">backoff:...:until:knowpost:123</div><div class="kr">delay+1s</div><div class="kr">退避截止</div>
+    </div>
+  </details>
+
+  <!-- T1 talk track -->
+  <details class="glass-card" id="t1-6">
+    <summary>7. 面试话术（3-4 分钟）</summary>
+    <table>
+      <thead><tr><th>时间</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td>30s</td><td><strong>架构决策：</strong>判存+计数 → 两层模型（Bitmap事实层 + SDS聚合层）</td></tr>
+        <tr><td>1min</td><td><strong>写入链路：</strong>Lua原子翻转 → Kafka → Hash聚合桶合并 → 定时折叠到SDS。重点：幂等 + 聚合桶的写放大概率</td></tr>
+        <tr><td>30s</td><td><strong>读取：</strong>SDS一次GET拿全部计数。isLiked直接读Bitmap</td></tr>
+        <tr><td>1min</td><td><strong>重建亮点：</strong>三层保护协同——限流防风暴、分布式锁防并发、指数退避防无限重试</td></tr>
+        <tr><td>30s</td><td><strong>收尾：</strong>灾备consumer默认关闭的原因</td></tr>
+      </tbody>
+    </table>
+  </details>
+</div>
+
+<!-- ==================== TOPIC 2: RELATION ==================== -->
+<div class="fade-in" id="topic2" style="margin-top:2rem">
+  <div class="section-subtitle">Topic 2</div>
+  <h2 class="section-hero" style="font-size:1.8rem">用户关系 — 双表镜像 + Outbox 事件驱动</h2>
+
+  <details class="glass-card" id="t2-0" open>
+    <summary>0. 核心问题 &amp; 数据模型</summary>
+    <p><strong>朴素方案：</strong></p>
+    <div class="code-block"><span class="kw">INSERT INTO</span> following (from_user_id, to_user_id) <span class="kw">VALUES</span> (1, 2);
+<span class="kw">SELECT</span> from_user_id <span class="kw">FROM</span> following <span class="kw">WHERE</span> to_user_id=2 <span class="kw">ORDER BY</span> created_at <span class="kw">LIMIT</span> 20;</div>
+    <p>问题是<strong>5000 万粉丝的大 V</strong>——即使走索引也要扫描 5000 万行排序。FB 式 fan-out 读扩散扛不住。</p>
+
+    <p><strong>解决方案：同一个操作存两张表，行列互换</strong></p>
+    <div class="diagram">
+following (主表)                    follower (镜像)
+┌──────────────────────┐          ┌──────────────────────┐
+│ id: 1001             │          │ id: 2001             │
+│ from_user_id: 1      │          │ to_user_id: 2        │
+│ to_user_id: 2        │          │ from_user_id: 1      │
+│ rel_status: 1        │          │ rel_status: 1        │
+└──────────────────────┘          └──────────────────────┘
+ UK: (from, to)                     UK: (to, from)
+ 查"我关注了谁"                     查"谁关注了我"</div>
+    <p>就像同一份名单按不同字段排序存两份——查的时候不用翻页。</p>
+
+    <div class="callout warn">
+      <strong>面试提醒：</strong> 代码里叫"一主多从"，但容易和 MySQL 主从复制混淆。<strong>面试时用"双表镜像"更安全。</strong>
+    </div>
+
+    <p><strong>为什么不用一张表 + 两个索引？</strong> ① 读写隔离——粉丝列表 QPS 远高于关注列表，可分库；② 与 Outbox 异步边界一致；③ 每表只维护一个唯一索引，插入竞争小。</p>
+  </details>
+
+  <details class="glass-card" id="t2-1">
+    <summary>1. 写入链路 — 17 步全路径</summary>
+    <div class="diagram" style="font-size:0.7rem;line-height:1.5">
+POST /api/v1/relation/follow?toUserId=2
+  │
+  ▼
+<span style="color:#f59e0b">RelationServiceImpl.follow()</span>
+  ├─ 1. TOKEN_BUCKET_LUA: rl:follow:1, cap=100, rate=1/s
+  ├─ 2. <span style="color:#10b981">@Transactional</span> 开始
+  ├─ 3. INSERT following (id=random, ON DUPLICATE KEY UPDATE)
+  ├─ 4. INSERT outbox (同事务!)
+  └─ 5. 事务提交 → binlog 记录两条 INSERT
+
+  ▼
+<span style="color:#38bdf8">CanalKafkaBridge</span> (SmartLifecycle, 独立线程)
+  ├─ 6. getWithoutAck(batchSize) → 拉binlog
+  ├─ 7. 过滤: table="outbox", type=INSERT
+  ├─ 8. 提取 payload → {"table":"outbox","data":[{"payload":"..."}]}
+  ├─ 9. kafka.send("canal-outbox")
+  └─ 10. ack(batchId) → 推进位点
+
+  ▼
+<span style="color:#38bdf8">CanalOutboxConsumer</span> → RelationEventProcessor.process()
+  ├─ 11. SETNX "dedup:rel:FollowCreated:1:2:&lt;id&gt;", TTL=10min
+  ├─ 12. INSERT follower (id, to_user_id, from_user_id, rel_status=1)
+  ├─ 13. ZADD "uf:flws:1" {now} "2"  + EXPIRE 2h
+  ├─ 14. ZADD "uf:fans:2" {now} "1"  + EXPIRE 2h
+  ├─ 15. incrementFollowings(1, +1) → ucnt:1
+  └─ 16. incrementFollowers(2, +1)  → ucnt:2</div>
+
+    <div class="callout danger" style="margin-top:1rem">
+      <strong>为什么 Outbox 和 following 必须同事务？</strong><br>
+      分开写 → DB 提交了但 Outbox 没写（MySQL 挂了）→ follower 表永不更新、ZSet 永不更新、计数永不 +1 → <strong>数据永久不一致且无法自动恢复</strong>。<br>
+      同事务 → 要么都成功（binlog 有记录 → Canal 能读到 → 完整链路），要么都失败（用户看到"关注失败"，可以重试）。
+    </div>
+  </details>
+
+  <details class="glass-card" id="t2-2">
+    <summary>2. 设计深挖</summary>
+
+    <h4>Canal vs 直接发 Kafka</h4>
+    <div class="callout good">
+      <strong>比喻：</strong> 直接发 Kafka = 做完事后自己打电话通知（可能忘打/打不通）。Outbox + Canal = 在公告板贴便条（binlog），Canal 专门负责抄公告。<strong>只要事务提交了，binlog 里就一定有，Canal 就一定能读到。</strong>
+    </div>
+    <table>
+      <thead><tr><th></th><th>可靠性</th><th>复杂度</th><th>为什么这个系统用它</th></tr></thead>
+      <tbody>
+        <tr><td>直接发 Kafka</td><td>可能丢（网络问题）</td><td>低</td><td>计数系统——丢一条事件 = 赞数少1，下次重建修复</td></tr>
+        <tr><td>Outbox + Canal</td><td><strong>不丢</strong></td><td>高</td><td>关系系统——丢一条 = 数据永久损坏</td></tr>
+      </tbody>
+    </table>
+
+    <h4 style="margin-top:1.2rem">去重 SETNX 10 分钟的边界</h4>
+    <div class="cmp-box">
+      <div class="side risk"><h4>边界1: 消息延迟 > 10min</h4>Kafka rebalance 15min → SETNX key 已过期 → 重复处理。follower 表 ON DUPLICATE KEY 还行，但计数器会 +1 两次。下次 300s 校验修复。</div>
+      <div class="side good"><h4>边界2: 取关后重关注</h4>第二次关注生成新 following id (B≠A) → 去重 key 不同 → 不误判。</div>
+    </div>
+
+    <h4 style="margin-top:1.2rem">令牌桶限流</h4>
+    <p>capacity=100, rate=1/s。允许 1 秒内 burst 关注 100 人（批量导入），之后等 1 秒才能再关注。用 Lua 脚本 + Redis Hash 实现，<code class="code-inline">redis.call('TIME')[1]</code> 获取单调秒数。</p>
+  </details>
+
+  <details class="glass-card" id="t2-3">
+    <summary>3. 读取链路 &amp; 计数器自愈</summary>
+    <div class="diagram">
+GET /api/v1/relation/followers?userId=2&limit=20&offset=0
+  │
+  ├─ L0: Caffeine 本地 Top 缓存 (仅大V, &ge;50万粉, 前500名)
+  │
+  ├─ L1: Redis ZSet "uf:fans:2", ZREVRANGE, TTL=2h
+  │     score = created_at 毫秒戳 → 最近关注排前面
+  │
+  └─ L2: MySQL follower 表 → fillZSet → 回填 → EXPIRE 2h</div>
+
+    <div class="callout good">
+      <strong>自愈机制：</strong> 每 300 秒（SETNX 锁），SELECT COUNT(*) 对比 SDS 值。不一致 → rebuildAllCounters() 从 DB 重算全部 5 个字段。最多 300 秒自动发现并修复，不需人工介入。
+    </div>
+  </details>
+
+  <details class="glass-card" id="t2-4">
+    <summary>4. Key 索引 &amp; 话术</summary>
+    <div class="key-grid" style="grid-template-columns:1fr 80px 1fr 60px 1fr">
+      <div class="kh">Key</div><div class="kh">类型</div><div class="kh">示例</div><div class="kh">TTL</div><div class="kh">说明</div>
+      <div class="kr"><code>rl:follow:{uid}</code></div><div class="kr">Hash</div><div class="kr">rl:follow:1</div><div class="kr">60s</div><div class="kr">令牌桶</div>
+      <div class="kr"><code>uf:flws:{uid}</code></div><div class="kr">ZSet</div><div class="kr">uf:flws:1</div><div class="kr">2h</div><div class="kr">关注列表</div>
+      <div class="kr"><code>uf:fans:{uid}</code></div><div class="kr">ZSet</div><div class="kr">uf:fans:2</div><div class="kr">2h</div><div class="kr">粉丝列表</div>
+      <div class="kr"><code>ucnt:{uid}</code></div><div class="kr">String</div><div class="kr">ucnt:1</div><div class="kr">无</div><div class="kr">5×4字节SDS</div>
+      <div class="kr"><code>ucnt:chk:{uid}</code></div><div class="kr">String</div><div class="kr">ucnt:chk:1</div><div class="kr">300s</div><div class="kr">校验锁</div>
+      <div class="kr"><code>dedup:rel:{t}:{f}:{to}:{id}</code></div><div class="kr">String</div><div class="kr">dedup:rel:FollowCreated:1:2:1001</div><div class="kr">10min</div><div class="kr">去重</div>
+    </div>
+    <div class="callout good" style="margin-top:1rem">
+      <strong>面试话术（3-4min）：</strong> ① 问题：大V粉丝列表不能扫全表 → 双表镜像 + ZSet ② 写：令牌桶→同事务→Canal→Kafka→消费者 ③ 读：大V本地Top缓存→Redis ZSet→DB ④ 一致性：10min去重 + 300s自愈校验
+    </div>
+  </details>
+</div>
+
+<!-- ==================== TOPIC 3: FEED ==================== -->
+<div class="fade-in" id="topic3" style="margin-top:2rem">
+  <div class="section-subtitle">Topic 3</div>
+  <h2 class="section-hero" style="font-size:1.8rem">Feed 流 — 多级缓存 + 热点探测</h2>
+
+  <details class="glass-card" id="t3-0" open>
+    <summary>0. 三种场景，三种缓存策略</summary>
+    <table>
+      <thead><tr><th>场景</th><th>策略</th><th>核心考量</th></tr></thead>
+      <tbody>
+        <tr><td><strong>公共 Feed</strong></td><td>片段缓存：ID列表 + Item JSON</td><td>共享率极高。拆成 ids+items，item 粒度独立失效</td></tr>
+        <tr><td><strong>我的发布</strong></td><td>整页 JSON</td><td>用户独占。一页一个 key，省事</td></tr>
+        <tr><td><strong>内容详情</strong></td><td>整页 JSON + null cache</td><td>单条内容。额外 null cache 防穿透</td></tr>
+      </tbody>
+    </table>
+    <p><strong>为什么公共 Feed 要拆片段？</strong> 如果不拆，每页一个 Redis key 存 20 条帖子的完整 JSON。点赞时需要一个一个页面找出来改计数——你不知道帖子 123 在前 100 页的哪些页面上。拆成 ids + items 后，点赞只需改一个 item key。</p>
+  </details>
+
+  <details class="glass-card" id="t3-1">
+    <summary>1. 公共 Feed 请求链路 — 三级缓存</summary>
+    <div class="diagram" style="font-size:0.7rem;line-height:1.5">
+GET /api/v1/knowpost/feed?page=1&size=20  (uid=99)
+  │
+  ├─ <span style="color:#f59e0b">L0 Caffeine</span> (15s) → feedPublicCache.get(localPageKey)
+  │   命中 → recordHotKey → enrich(liked/faved实时) → 返回
+  │
+  ├─ <span style="color:#38bdf8">L1 Redis片段</span> → assembleFromCache(idsKey, hasMoreKey)
+  │   ① LRANGE idsKey 0 19 → 20个ID
+  │   ② MGET feed:item:101 ... 120 → 20条JSON
+  │   ③ counterService.getCounts() + isLiked() → 实时计数+用户状态
+  │   命中 → put Caffeine → enrich → 返回
+  │
+  ├─ <span style="color:#ef4444">singleFlight</span>
+  │   synchronized(idsKey lock) { double-check → ... }
+  │
+  └─ <span style="color:#10b981">L2 MySQL</span>
+      SELECT ... LIMIT 21 OFFSET 0 → rows&ge;20? hasMore
+      → writeCaches: LPUSH idsKey | SET item JSON | SADD 反向索引
+      → put Caffeine → enrich → singleFlight.remove(idsKey) → 返回</div>
+
+    <div class="callout">
+      <strong>用户状态不入缓存：</strong> liked/faved 永远不在 Redis 缓存中。返回前通过 enrich() 实时查 CounterService.isLiked()。
+      缓存是共享的，用户状态是私有的——不能污染。
+    </div>
+  </details>
+
+  <details class="glass-card" id="t3-2">
+    <summary>2. 设计深挖 — 小时槽 · 反向索引 · single-flight · 抖动</summary>
+
+    <h4>小时槽分片 hourSlot</h4>
+    <p>缓存 key 嵌入 <code class="code-inline">hourSlot = now / 3600000</code>。新帖发布只影响当前小时的 ids key，上一小时的缓存靠 TTL 自然过期。避免"写一篇文章让 100 页缓存全失效"的雪崩。</p>
+
+    <h4 style="margin-top:1rem">反向索引 — 点赞时精准更新</h4>
+    <div class="diagram" style="font-size:0.75rem">
+监听 CounterEvent (like/fav 变化)
+  ├─ SMEMBERS feed:public:index:{eid}:{hourSlot}      ← 当前小时
+  ├─ SMEMBERS feed:public:index:{eid}:{hourSlot-1}    ← 上一小时
+  ├─ 对每个页面 key: 更新 Caffeine (保留 liked/faved) + 更新 Redis (清除 liked/faved)
+  └─ 写回Redis时保留原TTL (writePageJsonKeepingTtl)</div>
+
+    <h4 style="margin-top:1rem">single-flight</h4>
+    <p>锁 key 用 <strong>idsKey</strong>（Redis 层面）而不是 localPageKey（本地）。跨实例全局唯一。只有持锁线程回源 DB，其他线程 double-check 等缓存填满。注意 <code class="code-inline">finally { singleFlight.remove(idsKey); }</code> 防泄漏。</p>
+
+    <h4 style="margin-top:1rem">随机抖动</h4>
+    <table>
+      <thead><tr><th>缓存层</th><th>TTL</th><th>浮动%</th></tr></thead>
+      <tbody>
+        <tr><td>item/id 片段</td><td>60s + rand(0~30)</td><td>50%</td></tr>
+        <tr><td>hasMore 软缓存</td><td>10s + rand(0~10)</td><td>100%</td></tr>
+        <tr><td>我的发布</td><td>30s + rand(0~20)</td><td>67%</td></tr>
+        <tr><td><strong>Caffeine 本地</strong></td><td><strong>固定（无抖动）</strong></td><td>—</td></tr>
+      </tbody>
+    </table>
+    <p>Caffeine 是单实例，不存在"集群 100 个节点同时过期同一个 key"。雪崩只发生在共享 Redis 层。</p>
+  </details>
+
+  <details class="glass-card" id="t3-3">
+    <summary>3. HotKeyDetector — 滑动窗口数值走读</summary>
+    <p>60 秒窗口，6 段 × 10 秒。每个 key 一个 int[6]。</p>
+    <div class="diagram" style="font-size:0.75rem;line-height:1.55">
+<span style="color:#f59e0b">帖子 #888 的访问时间线：</span>
+ 第 0-10s:  100次 → seg[0]=100
+ 第10-20s:  150次 → seg[1]=150
+ 第20-30s:  200次 → seg[2]=200
+ 第30-40s:  300次 → seg[3]=300
+ 第40-50s:   50次 → seg[4]=50
+ 第50-60s:   10次 → seg[5]=10  ← current
+<span style="color:#10b981">总热度 = 100+150+200+300+50+10 = 810 → HIGH(&ge;500) → TTL=60+120=180s</span>
+
+10s后 rotate: current→seg[0], seg[0]归零
+ 第60-70s:   5次 → seg[0]=5
+ 总热度 = 5+150+200+300+50+10 = 715 ← 开始降
+
+再过50s(第120s), seg[3]的300被rotate出去:
+ 总热度 ≈ 50 → NONE → 回到基准TTL 60s</div>
+
+    <div class="callout good">
+      <strong>自然衰减：</strong> 不需要额外定时器。rotate 时自动丢弃最老那格数据，热度随时间自然降。<br>
+      <strong>每个 key 24 字节</strong>（6×4B），100 万个 key = 24MB。<br>
+      <strong>只延长不缩短</strong> — TTL 到期后重新缓存，自然会用新（更短）的 TTL。
+    </div>
+  </details>
+
+  <details class="glass-card" id="t3-4">
+    <summary>4. 三种缓存问题 vs 三种解法</summary>
+    <table>
+      <thead><tr><th>问题</th><th>原因</th><th>方案</th><th>代码位置</th></tr></thead>
+      <tbody>
+        <tr><td><strong>击穿</strong></td><td>热点 key 过期，大量并发打 DB</td><td>single-flight</td><td>getPublicFeed() sync块</td></tr>
+        <tr><td><strong>雪崩</strong></td><td>大量 key 同时过期</td><td>随机抖动</td><td>各 writeCaches 处</td></tr>
+        <tr><td><strong>穿透</strong></td><td>请求不存在的数据</td><td>空值缓存 "NULL"</td><td>getDetail() null cache</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout good" style="margin-top:1rem">
+      <strong>面试话术（4-5min）：</strong> ① 架构：三级缓存，公共 Feed 核心是片段缓存+小时槽+反向索引
+      ② 片段：拆 ids+items，item 独立失效 → 反向索引精准定位 → 小时槽防大面积失效
+      ③ single-flight + jitter + null cache 对应三种问题
+      ④ hotkey：60s/6段滑动窗口，按热度分四级，动态延长 TTL，自然衰减
+      ⑤ 用户状态(liked/faved)不入共享缓存，实时叠加
+    </div>
+  </details>
+
+  <details class="glass-card" id="t3-5">
+    <summary>5. 完整 Redis Key 索引</summary>
+    <div class="key-grid" style="grid-template-columns:1fr 80px 1fr 70px 1fr">
+      <div class="kh">Key</div><div class="kh">类型</div><div class="kh">示例</div><div class="kh">TTL</div><div class="kh">说明</div>
+      <div class="kr"><code>feed:public:ids:{sz}:{h}:{p}</code></div><div class="kr">List</div><div class="kr">feed:public:ids:20:12345:1</div><div class="kr">60-90s</div><div class="kr">ID列表</div>
+      <div class="kr"><code>feed:item:{id}</code></div><div class="kr">String</div><div class="kr">feed:item:101</div><div class="kr">60-90s</div><div class="kr">item元数据</div>
+      <div class="kr"><code>feed:public:index:{eid}:{h}</code></div><div class="kr">Set</div><div class="kr">feed:public:index:123:12345</div><div class="kr">60-90s</div><div class="kr">反向索引</div>
+      <div class="kr"><code>feed:mine:{uid}:{sz}:{p}</code></div><div class="kr">String</div><div class="kr">feed:mine:1:20:1</div><div class="kr">30-50s</div><div class="kr">我的发布</div>
+      <div class="kr"><code>knowpost:detail:{id}:v{ver}</code></div><div class="kr">String</div><div class="kr">knowpost:detail:123:v1</div><div class="kr">60-90s</div><div class="kr">详情缓存</div>
+    </div>
+  </details>
+</div>
+
+<!-- ==================== INTERVIEW QUESTIONS ==================== -->
+<div class="fade-in" id="interview" style="margin-top:2.5rem">
+  <div class="section-subtitle">面试实战</div>
+  <h2 class="section-hero" style="font-size:1.8rem">深度面试拷打 50 题</h2>
+
+  <details class="glass-card">
+    <summary>一、互动计数（Q1-Q15）</summary>
+    <div style="font-size:0.85rem;color:var(--text-dim);line-height:1.9">
+      <p><strong>Q1</strong> 为什么选 Redis 位图而不是 Set 或 HyperLogLog？</p>
+      <p><strong>Q2</strong> 位图按 32768 分片，这个数字怎么来的？换成 65536 会怎样？</p>
+      <p><strong>Q3</strong> SDS 为什么用 4 字节大端 int32？</p>
+      <p><strong>Q4</strong> TOGGLE_LUA 为什么要先 GETBIT 再 SETBIT？</p>
+      <p><strong>Q5</strong> 为什么用 Lua 脚本而不是 MULTI/EXEC 或 WATCH？</p>
+      <p><strong>Q6</strong> INCR_FIELD_LUA 在读-改-写过程中如何防止并发覆盖？</p>
+      <p><strong>Q7</strong> 画出点赞的完整写入链路，每层挂了怎么恢复？</p>
+      <p><strong>Q8</strong> 为什么引入 Redis Hash 聚合桶？多这一层 hop 的 trade-off？</p>
+      <p><strong>Q9</strong> @Scheduled 1s 扫描 agg:* 有问题吗？怎么优化？</p>
+      <p><strong>Q10</strong> Kafka ack 和 HINCRBY 之间崩溃会怎样？</p>
+      <p><strong>Q11</strong> 重建期间有新的点赞写入，结果还准吗？</p>
+      <p><strong>Q12</strong> 三层保护（限流/锁/退避）分别解决什么问题？为什么 tryLock(0)？</p>
+      <p><strong>Q13</strong> KEYS 命令在生产环境的替代方案？</p>
+      <p><strong>Q14</strong> 重建后为什么删聚合桶字段？</p>
+      <p><strong>Q15</strong> CounterRebuildConsumer 从头回放 10 亿条事件会 OOM 吗？</p>
+    </div>
+  </details>
+
+  <details class="glass-card" style="margin-top:1rem">
+    <summary>二、用户关系（Q16-Q31）</summary>
+    <div style="font-size:0.85rem;color:var(--text-dim);line-height:1.9">
+      <p><strong>Q16</strong> 为什么维护 following + follower 两张表？</p>
+      <p><strong>Q17</strong> rel_status 为什么用软删除？</p>
+      <p><strong>Q18</strong> Outbox 为什么必须和 following 同事务？</p>
+      <p><strong>Q19</strong> Outbox ID 为什么用随机 Long 而不是 Snowflake？</p>
+      <p><strong>Q20</strong> Outbox 积压 100 万条，Canal 恢复后怎么处理？</p>
+      <p><strong>Q21</strong> CanalKafkaBridge 为什么实现 SmartLifecycle？</p>
+      <p><strong>Q22</strong> getWithoutAck + ack 是什么投递语义？</p>
+      <p><strong>Q23</strong> Canal 为什么只转发 payload 字段？</p>
+      <p><strong>Q24</strong> SETNX 去重 TTL 10 分钟够吗？</p>
+      <p><strong>Q25</strong> follower 表写成功但 ZSet 写失败怎么恢复？</p>
+      <p><strong>Q26</strong> 用户关注后粉丝数 +1 延迟多少？能接受吗？</p>
+      <p><strong>Q27</strong> 为什么用 ZSet 缓存粉丝列表？score 存什么？</p>
+      <p><strong>Q28</strong> 大 V 的 Caffeine Top 缓存什么时候生效？</p>
+      <p><strong>Q29</strong> ZSet 2h TTL 过期后 DB 回填有击穿风险吗？</p>
+      <p><strong>Q30</strong> 令牌桶 capacity=100 rate=1 怎么考虑的？</p>
+      <p><strong>Q31</strong> 300 秒抽样校验为什么不是每次？重建期间用户读到什么？</p>
+    </div>
+  </details>
+
+  <details class="glass-card" style="margin-top:1rem">
+    <summary>三、Feed 流（Q32-Q50）</summary>
+    <div style="font-size:0.85rem;color:var(--text-dim);line-height:1.9">
+      <p><strong>Q32</strong> 三级缓存 TTL 怎么定的？Caffeine 设为 60s 会怎样？</p>
+      <p><strong>Q33</strong> 公共 Feed 用片段缓存，我的发布用整页缓存，为什么不同？</p>
+      <p><strong>Q34</strong> hourSlot 嵌在 key 里解决什么问题？</p>
+      <p><strong>Q35</strong> 20 个帖子 × 2 次 GETBIT = 40 次 Redis 调用，怎么优化？</p>
+      <p><strong>Q36</strong> Caffeine 保留 liked/faved 但 Redis 不保留，为什么？</p>
+      <p><strong>Q37</strong> single-flight 锁 key 为什么用 idsKey 而不是 localPageKey？</p>
+      <p><strong>Q38</strong> 持锁线程查 DB 慢（5s），其他等锁线程会怎样？</p>
+      <p><strong>Q39</strong> 锁泄漏问题（remove 前抛异常）怎么修？</p>
+      <p><strong>Q40</strong> 去掉随机抖动，所有 key 同时过期会怎样？</p>
+      <p><strong>Q41</strong> 抖动范围怎么确定？为什么 hasMore 浮动 100% 而 item 只 50%？</p>
+      <p><strong>Q42</strong> 为什么是分段滑动窗口而不是简单计数器 + 时间戳？</p>
+      <p><strong>Q43</strong> 热点降了后 TTL 怎么缩短？</p>
+      <p><strong>Q44</strong> 应用重启后热度丢失，冷启动期间发生什么？</p>
+      <p><strong>Q45</strong> 反向索引过期了但 Redis 页面 JSON 还在，会发生什么？</p>
+      <p><strong>Q46</strong> getExpire 返回 -1（无过期）或 -2（不存在）怎么处理？</p>
+      <p><strong>Q47</strong> 反向索引只覆盖当前和上一小时，2 小时前的缓存能失效到吗？</p>
+      <p><strong>Q48</strong> QPS 从 1000 突增到 10000，瓶颈在哪？</p>
+      <p><strong>Q49</strong> Redis 完全挂了，Feed 系统还能服务吗？</p>
+      <p><strong>Q50</strong> 新帖发布到出现在关注者 Feed 里，和 Twitter fan-out-on-write 有什么不同？</p>
+    </div>
+  </details>
+</div>
+
+</main>
+
+<script>
+// Highlight active nav link on scroll
+const sections = document.querySelectorAll('[id]');
+const navLinks = document.querySelectorAll('.sidebar-nav a');
+
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      navLinks.forEach(l => l.classList.remove('active'));
+      const link = document.querySelector(`.sidebar-nav a[href="#${entry.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+
+sections.forEach(s => observer.observe(s));
+
+// Close sidebar on mobile when link clicked
+document.querySelectorAll('.sidebar-nav a').forEach(a => {
+  a.addEventListener('click', () => {
+    document.querySelector('.sidebar').classList.remove('open');
+  });
+});
+</script>
+
+</body>
+</html>

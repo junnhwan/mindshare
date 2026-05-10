@@ -16,11 +16,13 @@
     <insert id="insertFollowing">
         INSERT INTO following (id, from_user_id, to_user_id, rel_status, created_at, updated_at)
         VALUES (#{id}, #{fromUserId}, #{toUserId}, 1, #{now}, #{now})
+        ON DUPLICATE KEY UPDATE rel_status = 1, updated_at = #{now}
     </insert>
 
     <insert id="insertFollower">
         INSERT INTO follower (id, to_user_id, from_user_id, rel_status, created_at, updated_at)
         VALUES (#{id}, #{toUserId}, #{fromUserId}, 1, #{now}, #{now})
+        ON DUPLICATE KEY UPDATE rel_status = 1, updated_at = #{now}
     </insert>
 
     <update id="cancelFollowing">
