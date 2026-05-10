@@ -122,8 +122,6 @@ mvn test
 ## 文档
 
 - [API 接口总览](docs/api-phase1.md)
-- [本地运行手册](docs/runbook-local.md)
-- [参考项目差距分析](docs/2026-04-21-mindshare-vs-zhiguang-gap-analysis.md)
 
 ## License
 

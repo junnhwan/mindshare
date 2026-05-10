@@ -1,231 +1,226 @@
-# MindShare Phase-One API Summary
+# MindShare API 接口文档
 
-This document summarizes the currently implemented phase-one HTTP APIs.
+Base: `/api/v1`  ·  认证: `Authorization: Bearer <access_token>`
 
-Base path:
+## 认证 (Auth)
 
-- `/api/v1`
+### `POST /api/v1/auth/send-code`  — 发送验证码
 
-Authentication:
+公开接口。
 
-- protected endpoints expect a Bearer token issued by `/api/v1/auth/login` or `/api/v1/auth/register`
-- tests currently use JWT mocks; real runtime uses the configured RSA keys
+请求：
+- `identifierType`: `PHONE` | `EMAIL`
+- `identifier`: 手机号或邮箱
+- `scene`: `REGISTER` | `LOGIN` | `RESET_PASSWORD`
 
-## Counter
+限频：同标识符 60 秒内不可重复发送，单日上限 10 次。
 
-### `POST /api/v1/action/like`
+### `POST /api/v1/auth/register`  — 注册
 
-Protected action endpoint.
+请求：
+- `identifierType`, `identifier`, `code`: 验证码
+- `password`: 密码（≥8 位，含字母+数字）
+- `nickname`: 可选
 
-### `POST /api/v1/action/unlike`
+返回：`{ user: {...}, token: { accessToken, refreshToken, tokenType, expiresIn } }`
 
-Protected action endpoint.
+### `POST /api/v1/auth/login`  — 登录
 
-### `POST /api/v1/action/fav`
+支持密码登录或验证码登录（二选一）。
 
-Protected action endpoint.
+请求：
+- `identifierType`, `identifier`
+- `password` 或 `code`
 
-### `POST /api/v1/action/unfav`
+返回：同注册。
 
-Protected action endpoint.
+### `POST /api/v1/auth/token/refresh`  — 刷新令牌
 
-Request body for all four action endpoints:
+请求：`{ refreshToken }`
 
-- `entityType`
-- `entityId`
+返回：新的 Token 对。
 
-Current supported entity type:
+### `POST /api/v1/auth/logout`  — 登出
 
-- `knowpost`
+请求：`{ refreshToken }`
 
-### `GET /api/v1/counter/{etype}/{eid}`
+### `POST /api/v1/auth/password/reset`  — 重置密码
 
-Public read endpoint for current counter totals.
+请求：`{ identifierType, identifier, code, newPassword }`
 
-Query params:
+### `GET /api/v1/auth/me`  — 当前用户
 
-- `metrics` optional, comma-separated, currently supports `like,fav`
+需认证。返回完整用户信息：id, nickname, avatar, phone, email, zgId, gender, birthday, school, bio, tagsJson。
 
-## Auth
+---
 
-### `POST /api/v1/auth/send-code`
+## 用户资料 (Profile)
 
-Send a verification code to phone or email.
+### `GET /api/v1/profile`  — 查看资料
 
-### `POST /api/v1/auth/register`
+需认证。
 
-Register a new user and return access/refresh tokens.
+### `PATCH /api/v1/profile`  — 修改资料
 
-### `POST /api/v1/auth/login`
+需认证。可修改字段：nickname, bio, gender, birthday, school, tagJson, avatar。
 
-Login with password and return access/refresh tokens.
+### `POST /api/v1/profile/avatar`  — 上传头像
 
-### `POST /api/v1/auth/token/refresh`
+需认证。multipart/form-data，字段名 `file`。
 
-Exchange a refresh token for a new access token pair.
+---
 
-### `POST /api/v1/auth/logout`
+## 内容发布 (KnowPost)
 
-Invalidate a refresh token.
+### `POST /api/v1/knowposts/drafts`  — 创建草稿
 
-### `POST /api/v1/auth/password/reset`
+需认证。返回 `{ id }`。
 
-Reset password by verification-code flow.
+### `POST /api/v1/knowposts/{id}/content/confirm`  — 确认上传内容
 
-### `GET /api/v1/auth/me`
+需认证。请求：
+- `objectKey`: OSS 对象 Key
+- `etag`, `size`, `sha256`: 文件校验信息
 
-Return the current authenticated user.
+### `PATCH /api/v1/knowposts/{id}`  — 编辑元数据
 
-## Profile
+需认证。可修改：title, tagId, tags, imgUrls, visible, isTop, description。
 
-### `GET /api/v1/profile`
+### `POST /api/v1/knowposts/{id}/publish`  — 发布
 
-Return the current profile snapshot.
+需认证。草稿状态 → 已发布。同时写入 outbox 事件触发异步索引。
 
-### `PATCH /api/v1/profile`
+### `PATCH /api/v1/knowposts/{id}/top`  — 切换置顶
 
-Patch profile fields:
+需认证。
 
-- `nickname`
-- `bio`
-- `gender`
-- `birthday`
-- `school`
-- `tagJson`
-- `avatar`
+### `PATCH /api/v1/knowposts/{id}/visibility`  — 修改可见性
 
-### `POST /api/v1/profile/avatar`
+需认证。可选值：public, followers, school, private, unlisted。
 
-Multipart avatar upload endpoint.
+### `DELETE /api/v1/knowposts/{id}`  — 删除
 
-Request:
+需认证。软删除。
 
-- `multipart/form-data`
-- field name: `file`
+### `GET /api/v1/knowposts/feed`  — 公开信息流
 
-Behavior:
+公开接口。参数：page, size。返回：帖子列表（含 likeCount, favoriteCount, liked, faved）。
 
-- upload file to OSS
-- resolve public URL
-- write URL back to `users.avatar`
+### `GET /api/v1/knowposts/mine`  — 我的发布
 
-## Storage
+需认证。参数：page, size。
 
-### `POST /api/v1/storage/presign`
+### `GET /api/v1/knowposts/detail/{id}`  — 帖子详情
 
-Generate a presigned PUT URL for knowpost uploads.
+公开（已发布+公开）或作者可见。返回完整内容含计数。
 
-Supported scenes:
+### `POST /api/v1/knowposts/description/suggest`  — 描述建议
 
-- `knowpost_content`
-- `knowpost_image`
+需认证。当前为截断实现，后续接入 LLM。
 
-Guard:
+---
 
-- authenticated user must own the target knowpost draft
+## 互动计数 (Counter)
 
-## KnowPost
+### `POST /api/v1/action/like`  — 点赞
 
-### `POST /api/v1/knowposts/drafts`
+需认证。请求：`{ entityType, entityId }`。支持实体类型：`knowpost`。
 
-Create an empty draft and return its ID.
+幂等：同一用户重复点赞不产生副作用。
 
-### `POST /api/v1/knowposts/{id}/content/confirm`
+### `POST /api/v1/action/unlike`  — 取消点赞
 
-Confirm uploaded content object metadata for a draft.
+需认证。
 
-### `PATCH /api/v1/knowposts/{id}`
+### `POST /api/v1/action/fav`  — 收藏
 
-Patch knowpost metadata:
+需认证。幂等。
 
-- `title`
-- `tagId`
-- `tags`
-- `imgUrls`
-- `visible`
-- `isTop`
-- `description`
+### `POST /api/v1/action/unfav`  — 取消收藏
 
-### `PATCH /api/v1/knowposts/{id}/top`
+需认证。
 
-Update `isTop`.
+### `GET /api/v1/counter/{etype}/{eid}`  — 查询计数
 
-### `PATCH /api/v1/knowposts/{id}/visibility`
+公开接口。参数：`?metrics=like,fav`。返回指定实体的各指标计数。
 
-Update `visible`.
+---
 
-### `POST /api/v1/knowposts/{id}/publish`
+## 搜索 (Search)
 
-Publish a draft.
+### `GET /api/v1/search`  — 全文搜索
 
-### `DELETE /api/v1/knowposts/{id}`
+公开接口。参数：
+- `q`: 搜索关键词
+- `size`: 页大小（≤50）
+- `tags`: 标签过滤，逗号分隔
+- `after`: 游标 token，用于翻页
 
-Soft-delete a knowpost.
+只索引已发布且公开的内容。结果按相关性 + 互动计数排序，含正文命中片段高亮。
 
-### `GET /api/v1/knowposts/feed`
+### `GET /api/v1/search/suggest`  — 搜索建议
 
-Public feed.
+公开接口。参数：prefix, size。返回标题补全建议。
 
-Query params:
+---
 
-- `page`
-- `size`
+## 社交关系 (Relation)
 
-### `GET /api/v1/knowposts/mine`
+### `POST /api/v1/relation/follow`  — 关注
 
-Current user's published posts.
+需认证。参数：`?toUserId=`。
 
-### `GET /api/v1/knowposts/detail/{id}`
+### `POST /api/v1/relation/unfollow`  — 取关
 
-Knowpost detail.
+需认证。参数：`?toUserId=`。
 
-Rules:
+### `GET /api/v1/relation/status`  — 关系状态
 
-- public viewers can only access `published + public`
-- owner can view their own non-public drafts
+需认证。参数：`?userId=`。返回：`self` / `following` / `followedBy` / `mutual` / `none`。
 
-### `POST /api/v1/knowposts/description/suggest`
+### `GET /api/v1/relation/following`  — 关注列表
 
-Current placeholder description suggestion API.
+需认证。参数：userId（可选，默认自己）, page, size。返回含用户资料的列表。
 
-Note:
+### `GET /api/v1/relation/followers`  — 粉丝列表
 
-- this is not LLM-backed yet
+需认证。参数同上。
 
-## Search
+### `GET /api/v1/relation/counter`  — 关注/粉丝计数
 
-### `GET /api/v1/search`
+公开接口。参数：`?userId=`。返回 `{ following, followers }`。
 
-Query params:
+---
 
-- `q`
-- `size`
-- `tags`
-- `after`
+## 对象存储 (Storage)
 
-Current behavior:
+### `POST /api/v1/storage/presign`  — 生成预签名上传 URL
 
-- only indexes `published + public`
-- reads real body text from `content_url`
-- uses cursor-style `after` token rather than page number
-- returns a snippet when body content matches the keyword
-- returns real `likeCount / favoriteCount / liked / faved`
+需认证。请求：`{ postId, scene, contentType, ext? }`。
 
-### `GET /api/v1/search/suggest`
+场景：
+- `knowpost_content`: 正文文件（.md / .html / .txt / .json）
+- `knowpost_image`: 图片文件（.jpg / .png / .webp / .gif）
 
-Query params:
+校验：请求者必须是目标帖子的创建者。
 
-- `prefix`
-- `size`
+---
 
-Current behavior:
+## 错误响应格式
 
-- title completion suggestions only
+所有错误统一返回 HTTP 400（业务异常）或 500（服务异常），响应体：
 
-## Known Phase-One Limits
+```json
+{ "code": "IDENTIFIER_EXISTS", "message": "账号已存在" }
+```
 
-- counter currently uses the smallest replica slice, not the full Kafka aggregation chain yet
-- user-dimension counters are not implemented yet
-- follow/relation APIs do not exist yet
-- AI/RAG APIs do not exist yet
-- search ranking is not yet wired to real counter signals
+错误码：`IDENTIFIER_EXISTS`, `IDENTIFIER_NOT_FOUND`, `ZGID_EXISTS`, `VERIFICATION_RATE_LIMIT`, `VERIFICATION_DAILY_LIMIT`, `VERIFICATION_NOT_FOUND`, `VERIFICATION_MISMATCH`, `VERIFICATION_TOO_MANY_ATTEMPTS`, `INVALID_CREDENTIALS`, `PASSWORD_POLICY_VIOLATION`, `TERMS_NOT_ACCEPTED`, `REFRESH_TOKEN_INVALID`, `BAD_REQUEST`, `INTERNAL_ERROR`。
+
+---
+
+## 架构说明
+
+- **计数系统**: Redis Bitmap 幂等存储 → Kafka 异步聚合 → Redis SDS 紧凑计数 → Redisson 分布式锁重建
+- **缓存策略**: Caffeine L1 + Redis L2 + HotKey 热点探测动态 TTL + SingleFlight 防击穿 + 定向失效
+- **搜索链路**: 发布时写入 Outbox → 定时轮询消费 → ES 索引更新，最终一致
+- **社交关系**: 双表（following / follower）+ 用户维度计数器联动
