@@ -7,7 +7,7 @@ import { Button } from "../../components/ui/Button";
 import { SendCodeForm } from "./SendCodeForm";
 import { resetPassword } from "../../api/auth";
 import { resetPasswordSchema } from "../../lib/validators";
-import { ERROR_MESSAGES } from "../../lib/constants";
+import { ERROR_MESSAGES, detectIdentifierType } from "../../lib/constants";
 import { Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
 import type { z } from "zod";
@@ -42,6 +42,7 @@ export function ForgotPasswordPage() {
     setLoading(true);
     try {
       await resetPassword({
+        identifierType: detectIdentifierType(data.identifier),
         identifier: data.identifier,
         code: data.code,
         newPassword: data.newPassword,
@@ -81,6 +82,7 @@ export function ForgotPasswordPage() {
           onIdentifierChange={(v) => setValue("identifier", v, { shouldValidate: true })}
           code={code}
           onCodeChange={(v) => setValue("code", v, { shouldValidate: true })}
+          scene="RESET_PASSWORD"
         />
         {errors.identifier && (
           <p className="text-xs text-error">{errors.identifier.message}</p>

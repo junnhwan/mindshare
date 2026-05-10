@@ -25,14 +25,17 @@ export interface LoginResponse {
   token: TokenPair;
 }
 
+export type IdentifierType = "PHONE" | "EMAIL";
+
 export interface LoginRequest {
+  identifierType: IdentifierType;
   identifier: string;
   password?: string;
   code?: string;
-  channel: "PASSWORD" | "CODE";
 }
 
 export interface RegisterRequest {
+  identifierType: IdentifierType;
   identifier: string;
   code: string;
   password: string;
@@ -40,10 +43,13 @@ export interface RegisterRequest {
 }
 
 export interface SendCodeRequest {
+  scene: "REGISTER" | "LOGIN" | "RESET_PASSWORD";
+  identifierType: IdentifierType;
   identifier: string;
 }
 
 export interface ResetPasswordRequest {
+  identifierType: IdentifierType;
   identifier: string;
   code: string;
   newPassword: string;

@@ -3,7 +3,7 @@ import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
 import { sendCode } from "../../api/auth";
 import toast from "react-hot-toast";
-import { ERROR_MESSAGES } from "../../lib/constants";
+import { ERROR_MESSAGES, detectIdentifierType } from "../../lib/constants";
 
 interface SendCodeFormProps {
   identifier: string;
@@ -11,6 +11,7 @@ interface SendCodeFormProps {
   code: string;
   onCodeChange: (value: string) => void;
   identifierLabel?: string;
+  scene: "REGISTER" | "LOGIN" | "RESET_PASSWORD";
 }
 
 export function SendCodeForm({
@@ -19,6 +20,7 @@ export function SendCodeForm({
   code,
   onCodeChange,
   identifierLabel = "手机号 / 邮箱",
+  scene,
 }: SendCodeFormProps) {
   const [countdown, setCountdown] = useState(0);
 
@@ -28,7 +30,7 @@ export function SendCodeForm({
       return;
     }
     try {
-      await sendCode({ identifier: identifier.trim() });
+      await sendCode({ scene, identifierType: detectIdentifierType(identifier.trim()), identifier: identifier.trim() });
       toast.success("验证码已发送");
       setCountdown(60);
       const timer = setInterval(() => {

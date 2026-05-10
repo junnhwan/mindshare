@@ -10,7 +10,7 @@ import { useAuthStore } from "../../store/authStore";
 import { setTokens } from "../../api/client";
 import { persistTokens } from "../../auth/tokenStore";
 import { loginSchema } from "../../lib/validators";
-import { ERROR_MESSAGES } from "../../lib/constants";
+import { ERROR_MESSAGES, detectIdentifierType } from "../../lib/constants";
 import { Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
 import type { z } from "zod";
@@ -34,7 +34,7 @@ export function LoginPage() {
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { identifier: "", password: "", channel: "PASSWORD" },
+    defaultValues: { identifier: "", password: "" },
   });
 
   // Code form
@@ -44,7 +44,7 @@ export function LoginPage() {
   const onPasswordSubmit = async (data: LoginFormData) => {
     setLoading(true);
     try {
-      const result = await login(data);
+      const result = await login({ identifierType: detectIdentifierType(data.identifier), identifier: data.identifier, password: data.password });
       setAuth(result.user, result.token.accessToken, result.token.refreshToken);
       setTokens(result.token.accessToken, result.token.refreshToken);
       persistTokens(result.token.accessToken, result.token.refreshToken);
@@ -64,9 +64,9 @@ export function LoginPage() {
     setLoading(true);
     try {
       const result = await login({
+        identifierType: detectIdentifierType(codeIdentifier.trim()),
         identifier: codeIdentifier.trim(),
         code,
-        channel: "CODE",
       });
       setAuth(result.user, result.token.accessToken, result.token.refreshToken);
       setTokens(result.token.accessToken, result.token.refreshToken);
@@ -150,6 +150,7 @@ export function LoginPage() {
             onIdentifierChange={setCodeIdentifier}
             code={code}
             onCodeChange={setCode}
+            scene="LOGIN"
           />
           <Button
             onClick={onCodeSubmit}

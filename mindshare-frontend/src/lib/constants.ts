@@ -33,3 +33,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export const PAGE_SIZE = 20;
+
+export function detectIdentifierType(identifier: string): "PHONE" | "EMAIL" {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier.trim()) ? "EMAIL" : "PHONE";
+}

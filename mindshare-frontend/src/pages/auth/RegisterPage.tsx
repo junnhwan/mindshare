@@ -11,7 +11,7 @@ import { useAuthStore } from "../../store/authStore";
 import { setTokens } from "../../api/client";
 import { persistTokens } from "../../auth/tokenStore";
 import { registerSchema } from "../../lib/validators";
-import { ERROR_MESSAGES } from "../../lib/constants";
+import { ERROR_MESSAGES, detectIdentifierType } from "../../lib/constants";
 import { Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
 import type { z } from "zod";
@@ -48,15 +48,16 @@ export function RegisterPage() {
     setLoading(true);
     try {
       await registerApi({
+        identifierType: detectIdentifierType(data.identifier),
         identifier: data.identifier,
         code: data.code,
         password: data.password,
         nickname: data.nickname || undefined,
       });
       const result = await login({
+        identifierType: detectIdentifierType(data.identifier),
         identifier: data.identifier,
         password: data.password,
-        channel: "PASSWORD",
       });
       setAuth(result.user, result.token.accessToken, result.token.refreshToken);
       setTokens(result.token.accessToken, result.token.refreshToken);
@@ -82,6 +83,7 @@ export function RegisterPage() {
           onIdentifierChange={(v) => setValue("identifier", v, { shouldValidate: true })}
           code={code}
           onCodeChange={(v) => setValue("code", v, { shouldValidate: true })}
+          scene="REGISTER"
         />
         {errors.identifier && (
           <p className="text-xs text-error">{errors.identifier.message}</p>
