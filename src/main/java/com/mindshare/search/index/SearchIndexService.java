@@ -150,21 +150,46 @@ public class SearchIndexService {
             if (exists) {
                 return;
             }
-            client.indices().create(create -> create.index(indexName()).mappings(mapping -> mapping
-                    .properties("content_id", property -> property.long_(number -> number))
-                    .properties("title", property -> property.text(text -> text))
-                    .properties("description", property -> property.text(text -> text))
-                    .properties("body", property -> property.text(text -> text))
-                    .properties("tags", property -> property.keyword(keyword -> keyword))
-                    .properties("img_urls", property -> property.keyword(keyword -> keyword))
-                    .properties("author_avatar", property -> property.keyword(keyword -> keyword))
-                    .properties("author_nickname", property -> property.keyword(keyword -> keyword))
-                    .properties("author_tag_json", property -> property.keyword(keyword -> keyword))
-                    .properties("status", property -> property.keyword(keyword -> keyword))
-                    .properties("visible", property -> property.keyword(keyword -> keyword))
-                    .properties("is_top", property -> property.boolean_(bool -> bool))
-                    .properties("publish_time", property -> property.date(date -> date))
-                    .properties("title_suggest", property -> property.completion(completion -> completion))));
+            try {
+                client.indices().create(create -> create.index(indexName()).mappings(mapping -> mapping
+                        .properties("content_id", property -> property.long_(number -> number))
+                        .properties("title", property -> property.text(text -> text.analyzer("ik_max_word").searchAnalyzer("ik_smart")))
+                        .properties("description", property -> property.text(text -> text.analyzer("ik_max_word").searchAnalyzer("ik_smart")))
+                        .properties("body", property -> property.text(text -> text.analyzer("ik_max_word").searchAnalyzer("ik_smart")))
+                        .properties("tags", property -> property.keyword(keyword -> keyword))
+                        .properties("img_urls", property -> property.keyword(keyword -> keyword))
+                        .properties("author_avatar", property -> property.keyword(keyword -> keyword))
+                        .properties("author_nickname", property -> property.keyword(keyword -> keyword))
+                        .properties("author_tag_json", property -> property.keyword(keyword -> keyword))
+                        .properties("status", property -> property.keyword(keyword -> keyword))
+                        .properties("visible", property -> property.keyword(keyword -> keyword))
+                        .properties("is_top", property -> property.boolean_(bool -> bool))
+                        .properties("publish_time", property -> property.date(date -> date))
+                        .properties("like_count", property -> property.long_(number -> number))
+                        .properties("favorite_count", property -> property.long_(number -> number))
+                        .properties("view_count", property -> property.long_(number -> number))
+                        .properties("title_suggest", property -> property.completion(completion -> completion))));
+            } catch (Exception e) {
+                // IK analyzer not installed, fallback to standard
+                client.indices().create(create -> create.index(indexName()).mappings(mapping -> mapping
+                        .properties("content_id", property -> property.long_(number -> number))
+                        .properties("title", property -> property.text(text -> text))
+                        .properties("description", property -> property.text(text -> text))
+                        .properties("body", property -> property.text(text -> text))
+                        .properties("tags", property -> property.keyword(keyword -> keyword))
+                        .properties("img_urls", property -> property.keyword(keyword -> keyword))
+                        .properties("author_avatar", property -> property.keyword(keyword -> keyword))
+                        .properties("author_nickname", property -> property.keyword(keyword -> keyword))
+                        .properties("author_tag_json", property -> property.keyword(keyword -> keyword))
+                        .properties("status", property -> property.keyword(keyword -> keyword))
+                        .properties("visible", property -> property.keyword(keyword -> keyword))
+                        .properties("is_top", property -> property.boolean_(bool -> bool))
+                        .properties("publish_time", property -> property.date(date -> date))
+                        .properties("like_count", property -> property.long_(number -> number))
+                        .properties("favorite_count", property -> property.long_(number -> number))
+                        .properties("view_count", property -> property.long_(number -> number))
+                        .properties("title_suggest", property -> property.completion(completion -> completion))));
+            }
         } catch (Exception ignored) {
         }
     }
@@ -194,6 +219,7 @@ public class SearchIndexService {
             return null;
         }
 
+        Map<String, Long> counts = counterService.getCounts("knowpost", String.valueOf(id), List.of("like", "fav"));
         return new SearchDocument(
                 row.getId(),
                 row.getTitle(),
@@ -208,7 +234,10 @@ public class SearchIndexService {
                 row.getVisible(),
                 row.getIsTop(),
                 row.getPublishTime(),
-                row.getTitle()
+                row.getTitle(),
+                counts.getOrDefault("like", 0L),
+                counts.getOrDefault("fav", 0L),
+                0L
         );
     }
 
@@ -273,6 +302,7 @@ public class SearchIndexService {
                             .fields("title", field -> field.numberOfFragments(0))
                             .fields("body", field -> field.fragmentSize(120).numberOfFragments(1)))
                     .sort(sort -> sort.score(score -> score.order(SortOrder.Desc)))
+                    .sort(sort -> sort.field(field -> field.field("like_count").order(SortOrder.Desc)))
                     .sort(sort -> sort.field(field -> field.field("publish_time").order(SortOrder.Desc)))
                     .sort(sort -> sort.field(field -> field.field("content_id").order(SortOrder.Desc)));
             if (cursor != null) {
@@ -462,6 +492,7 @@ public class SearchIndexService {
     private Comparator<SearchDocument> searchComparator(String keyword) {
         return Comparator
                 .comparingInt((SearchDocument document) -> score(document, keyword)).reversed()
+                .thenComparingLong((SearchDocument document) -> document.likeCount()).reversed()
                 .thenComparing((SearchDocument document) -> normalizePublishTime(document.publishTime()), Comparator.reverseOrder())
                 .thenComparing((SearchDocument document) -> document.contentId() == null ? Long.MIN_VALUE : document.contentId(), Comparator.reverseOrder());
     }
@@ -469,6 +500,7 @@ public class SearchIndexService {
     private SearchCursor cursorFor(SearchDocument document, String keyword) {
         return new SearchCursor(
                 score(document, keyword),
+                document.likeCount(),
                 normalizePublishTime(document.publishTime()),
                 document.contentId() == null ? Long.MIN_VALUE : document.contentId()
         );
@@ -476,25 +508,24 @@ public class SearchIndexService {
 
     private SearchCursor cursorFromHit(Hit<Map<String, Object>> hit) {
         List<FieldValue> sortValues = hit.sort();
-        if (sortValues == null || sortValues.size() < 3) {
+        if (sortValues == null || sortValues.size() < 4) {
             return null;
         }
         return new SearchCursor(
                 fieldValueAsDouble(sortValues.get(0)),
                 fieldValueAsLong(sortValues.get(1)),
-                fieldValueAsLong(sortValues.get(2))
+                fieldValueAsLong(sortValues.get(2)),
+                fieldValueAsLong(sortValues.get(3))
         );
     }
 
     private int compareCursor(SearchCursor left, SearchCursor right) {
         int byScore = Double.compare(right.score(), left.score());
-        if (byScore != 0) {
-            return byScore;
-        }
+        if (byScore != 0) return byScore;
+        int byLike = Long.compare(right.likeCount(), left.likeCount());
+        if (byLike != 0) return byLike;
         int byPublishTime = Long.compare(right.publishTime(), left.publishTime());
-        if (byPublishTime != 0) {
-            return byPublishTime;
-        }
+        if (byPublishTime != 0) return byPublishTime;
         return Long.compare(right.contentId(), left.contentId());
     }
 
@@ -664,10 +695,11 @@ public class SearchIndexService {
         return elasticsearchProperties.getIndexName();
     }
 
-    private record SearchCursor(double score, long publishTime, long contentId) {
+    private record SearchCursor(double score, long likeCount, long publishTime, long contentId) {
         private List<FieldValue> toFieldValues() {
             return List.of(
                     FieldValue.of(score),
+                    FieldValue.of(likeCount),
                     FieldValue.of(publishTime),
                     FieldValue.of(contentId)
             );
@@ -688,7 +720,10 @@ public class SearchIndexService {
             String visible,
             Boolean isTop,
             Instant publishTime,
-            String titleSuggest
+            String titleSuggest,
+            long likeCount,
+            long favoriteCount,
+            long viewCount
     ) {
         private Map<String, Object> toMap() {
             Map<String, Object> map = new LinkedHashMap<>();
@@ -706,6 +741,9 @@ public class SearchIndexService {
             map.put("is_top", isTop);
             map.put("publish_time", publishTime == null ? null : publishTime.toEpochMilli());
             map.put("title_suggest", titleSuggest);
+            map.put("like_count", likeCount);
+            map.put("favorite_count", favoriteCount);
+            map.put("view_count", viewCount);
             return map;
         }
     }
