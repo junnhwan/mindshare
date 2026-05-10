@@ -5,11 +5,11 @@
 INSERT INTO users (id, phone, email, password_hash, nickname, avatar, bio, zg_id, tags_json, birthday, school, gender)
 VALUES
 (1, '13800000001', 'alice@test.com',
- '$2a$12$mlW5LrnNjy6EdeVf2FjyYOoVwfl3VJzG7u6f3GD5qEQqLXWYVqKGi',
+ '$2a$12$Nm0e8ESoeLGMrKg/32k7yOFDKfiyzw7eRWs4HeqPl7wDdIgu4BO0K',
  'Alice', '', '全栈工程师，热爱技术分享', 'alice01',
  '["Java","Spring","React"]', '1998-05-20', '浙江大学', 'FEMALE'),
 (2, '13800000002', 'bob@test.com',
- '$2a$12$mlW5LrnNjy6EdeVf2FjyYOoVwfl3VJzG7u6f3GD5qEQqLXWYVqKGi',
+ '$2a$12$Nm0e8ESoeLGMrKg/32k7yOFDKfiyzw7eRWs4HeqPl7wDdIgu4BO0K',
  'Bob', '', '深耕AI与大数据领域', 'bob_ai',
  '["AI","BigData","Python"]', '1997-10-15', '北京大学', 'MALE');
 
