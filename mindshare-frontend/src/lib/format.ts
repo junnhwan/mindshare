@@ -1,19 +1,34 @@
 import { format, formatDistanceToNow, parseISO } from "date-fns";
 import { zhCN } from "date-fns/locale";
 
-export function formatDate(date: string | Date): string {
+export function formatDate(date: string | Date | null | undefined): string {
+  if (!date) return "";
   const d = typeof date === "string" ? parseISO(date) : date;
-  return format(d, "yyyy年M月d日", { locale: zhCN });
+  try {
+    return format(d, "yyyy年M月d日", { locale: zhCN });
+  } catch {
+    return "";
+  }
 }
 
-export function formatDateTime(date: string | Date): string {
+export function formatDateTime(date: string | Date | null | undefined): string {
+  if (!date) return "";
   const d = typeof date === "string" ? parseISO(date) : date;
-  return format(d, "yyyy年M月d日 HH:mm", { locale: zhCN });
+  try {
+    return format(d, "yyyy年M月d日 HH:mm", { locale: zhCN });
+  } catch {
+    return "";
+  }
 }
 
-export function formatRelativeTime(date: string | Date): string {
+export function formatRelativeTime(date: string | Date | null | undefined): string {
+  if (!date) return "";
   const d = typeof date === "string" ? parseISO(date) : date;
-  return formatDistanceToNow(d, { addSuffix: true, locale: zhCN });
+  try {
+    return formatDistanceToNow(d, { addSuffix: true, locale: zhCN });
+  } catch {
+    return "";
+  }
 }
 
 export function formatCount(n: number): string {

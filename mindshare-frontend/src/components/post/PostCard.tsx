@@ -20,7 +20,7 @@ export function PostCard({
   likeCount = 0,
   favCount = 0,
 }: PostCardProps) {
-  const coverImage = post.imgUrls?.length > 0 ? post.imgUrls[0] : null;
+  const coverImage = post.imgUrls && post.imgUrls.length > 0 ? post.imgUrls[0] : null;
 
   return (
     <Link

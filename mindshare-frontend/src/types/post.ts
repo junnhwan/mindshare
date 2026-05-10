@@ -4,14 +4,14 @@ export type PostStatus = "draft" | "published" | "deleted";
 export interface FeedItem {
   id: number;
   title: string;
-  description: string;
-  tags: string[];
-  imgUrls: string[];
-  authorAvatar: string;
-  authorNickname: string;
-  authorTagJson: string;
-  publishTime: string;
-  isTop: boolean;
+  description?: string;
+  tags?: string[];
+  imgUrls?: string[];
+  authorAvatar?: string;
+  authorNickname?: string;
+  authorTagJson?: string;
+  publishTime?: string;
+  isTop?: boolean;
 }
 
 export interface PostDetail {
