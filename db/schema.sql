@@ -64,3 +64,41 @@ CREATE TABLE IF NOT EXISTS know_posts (
 CREATE INDEX IF NOT EXISTS idx_know_posts_creator_id ON know_posts(creator_id);
 CREATE INDEX IF NOT EXISTS idx_know_posts_status_visible_publish_time
     ON know_posts(status, visible, publish_time DESC);
+
+CREATE TABLE IF NOT EXISTS outbox (
+    id BIGINT PRIMARY KEY,
+    aggregate_type VARCHAR(64) NOT NULL,
+    aggregate_id BIGINT,
+    event_type VARCHAR(64) NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_outbox_agg ON outbox(aggregate_type, aggregate_id);
+CREATE INDEX IF NOT EXISTS idx_outbox_ct ON outbox(created_at);
+
+CREATE TABLE IF NOT EXISTS following (
+    id BIGINT PRIMARY KEY,
+    from_user_id BIGINT NOT NULL,
+    to_user_id BIGINT NOT NULL,
+    rel_status INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_from_to UNIQUE (from_user_id, to_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_following_from ON following(from_user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_following_to ON following(to_user_id, from_user_id);
+
+CREATE TABLE IF NOT EXISTS follower (
+    id BIGINT PRIMARY KEY,
+    to_user_id BIGINT NOT NULL,
+    from_user_id BIGINT NOT NULL,
+    rel_status INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_to_from UNIQUE (to_user_id, from_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_follower_to ON follower(to_user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_follower_from ON follower(from_user_id, to_user_id);

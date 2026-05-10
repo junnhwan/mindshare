@@ -20,6 +20,7 @@ import com.mindshare.knowpost.model.KnowPostDetailRow;
 import com.mindshare.knowpost.model.KnowPostFeedRow;
 import com.mindshare.knowpost.service.KnowPostFeedService;
 import com.mindshare.knowpost.service.KnowPostService;
+import com.mindshare.knowpost.outbox.KnowPostOutboxConsumer;
 import com.mindshare.search.index.SearchIndexService;
 import com.mindshare.storage.OssStorageService;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -51,6 +52,7 @@ public class KnowPostServiceImpl implements KnowPostService {
     private final SearchIndexService searchIndexService;
     private final CounterService counterService;
     private final UserCounterService userCounterService;
+    private final KnowPostOutboxConsumer outboxConsumer;
     private final ConcurrentMap<String, Object> detailFlights = new ConcurrentHashMap<>();
 
     public KnowPostServiceImpl(
@@ -64,7 +66,8 @@ public class KnowPostServiceImpl implements KnowPostService {
             @Qualifier("knowPostDetailCache") Cache<String, KnowPostDetailResponse> knowPostDetailCache,
             SearchIndexService searchIndexService,
             CounterService counterService,
-            UserCounterService userCounterService
+            UserCounterService userCounterService,
+            KnowPostOutboxConsumer outboxConsumer
     ) {
         this.knowPostMapper = knowPostMapper;
         this.idGenerator = idGenerator;
@@ -77,6 +80,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         this.searchIndexService = searchIndexService;
         this.counterService = counterService;
         this.userCounterService = userCounterService;
+        this.outboxConsumer = outboxConsumer;
     }
 
     @Override
@@ -115,6 +119,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         }
         invalidateCaches(creatorId, id);
         searchIndexService.upsertKnowPost(id);
+        outboxConsumer.writeKnowPostEvent("upsert", id);
     }
 
     @Override
@@ -146,6 +151,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         }
         invalidateCaches(creatorId, id);
         searchIndexService.upsertKnowPost(id);
+        outboxConsumer.writeKnowPostEvent("upsert", id);
     }
 
     @Override
@@ -158,6 +164,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         userCounterService.incrementPosts(creatorId, 1);
         invalidateCaches(creatorId, id);
         searchIndexService.upsertKnowPost(id);
+        outboxConsumer.writeKnowPostEvent("upsert", id);
     }
 
     @Override
@@ -169,6 +176,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         }
         invalidateCaches(creatorId, id);
         searchIndexService.upsertKnowPost(id);
+        outboxConsumer.writeKnowPostEvent("upsert", id);
     }
 
     @Override
@@ -183,6 +191,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         }
         invalidateCaches(creatorId, id);
         searchIndexService.upsertKnowPost(id);
+        outboxConsumer.writeKnowPostEvent("upsert", id);
     }
 
     @Override
@@ -198,6 +207,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         }
         invalidateCaches(creatorId, id);
         searchIndexService.deleteKnowPost(id);
+        outboxConsumer.writeKnowPostEvent("delete", id);
     }
 
     @Override
