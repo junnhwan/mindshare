@@ -84,6 +84,12 @@ mindshare:
       extend-high-seconds: 300
   counter:
     redis-enabled: true
+    rebuild:
+      lock-ttl-ms: 5000
+      rate-permits: 3
+      rate-window-seconds: 10
+      backoff-base-ms: 500
+      backoff-max-ms: 30000
   elasticsearch:
     enabled: true
     index-name: ${ES_INDEX_NAME:mindshare_knowpost}
