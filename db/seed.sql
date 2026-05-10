@@ -1,6 +1,15 @@
 -- Seed data: 2 test users + 5 posts + relations + likes/favs
 -- Passwords are BCrypt of "Test1234"
 
+SET NAMES utf8mb4;
+
+DELETE FROM follower;
+DELETE FROM following;
+DELETE FROM outbox;
+DELETE FROM know_posts;
+DELETE FROM login_logs;
+DELETE FROM users;
+
 -- Users
 INSERT INTO users (id, phone, email, password_hash, nickname, avatar, bio, zg_id, tags_json, birthday, school, gender)
 VALUES
